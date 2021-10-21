@@ -33,8 +33,8 @@ prep_input_s = '"' + prep_input + '"'
 out_path = "D:/Git/d3d_meso/tests/outputTests/"
 output_filename = "tile_"
 
-tile_size_x = 200 # it is now in meter
-tile_size_y = 200 
+tile_size_x = 200 # it is now in meter or pixel if we use script (the last one)
+tile_size_y = 200 # which reads info in pixel
 
 ## Set and arrange projection
 # Convert the projection with gdal warp

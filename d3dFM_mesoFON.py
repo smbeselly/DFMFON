@@ -16,8 +16,13 @@ This is a temporary script file.
 # This is as the base for 'salinity approach' to kill the trees that are 
 # located outside the allowed area
 
-# ~ try splitting the shp files and the raster
-# ~ create function based on this recipe "splitD3Dmap"
+# =============================================================================
+# # ~ try splitting the shp files and the raster
+# # ~ create function based on this recipe "splitD3Dmap"
+# Already done in testSplitD3D
+# It creates a tiles of raster file with specific interval in meters or pixel
+# =============================================================================
+
 
 ### Loop
 
