@@ -35,6 +35,7 @@ from dfm_tools.get_nc_helpers import get_ncvardimlist, get_timesfromnc, get_hiss
 dir_testinput = os.path.join(r'D:\Delft3D FM\Tutorial_D-Flow_FM\tutorial09\tutorial09.dsproj_data\westerscheldt01')
 file_nc_map = os.path.join(dir_testinput,'output','westerscheldt01_map.nc')
 file_nc_his = os.path.join(dir_testinput,'output','westerscheldt01_his.nc')
+file_nc_ori = os.path.join(r'D:\Delft3D FM\Tutorial_D-Flow_FM\tutorial09\tutorial09.dsproj_data\westerscheldt01\input\westerscheldt_net.nc')
 
 #get lists with vars/dims, times, station/crs/structures
 vars_pd, dims_pd = get_ncvardimlist(file_nc=file_nc_map)
