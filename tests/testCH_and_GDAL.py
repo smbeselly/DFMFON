@@ -11,9 +11,6 @@ However, a csv from point should be created first along with the .vrt
 2) gdalwarp to cut the raster based on the shp (concave)
 
 3) build script to detect max min of no data and delete the tile
-idea: https://community.safe.com/s/question/0D54Q000080h7MWSAY/how-to-filter-out-raster-tiles-that-contain-only-nodata
-getting name as string: https://stackoverflow.com/questions/18425225/getting-the-name-of-a-variable-as-a-string
-or create smaller vector grid and call by ID: https://newbedev.com/clip-raster-by-shapefile-in-parts
 """
 #%% This script is from testCreateMatrix
 import os
@@ -30,6 +27,7 @@ import sys
 print(sys.path)
 sys.path.append('FnD3D')
 import ConcaveHull as CH
+from nodataraster import nodataraster
 
 #uncomment the line below, copy data locally and change this path to increase performance
 #dir_testinput = os.path.join(r'n:\Deltabox\Bulletin\veenstra\info dfm_tools\test_input')
@@ -59,11 +57,11 @@ mat_hull = np.block([[matrix[:,0]],[matrix[:,1]]]).T # create matrix x,y for hul
 
 #% creating concave hull
 hull = CH.concaveHull(mat_hull, 9) # utk case ini k=9
-CH.plotPath(matrix, hull)
+# CH.plotPath(matrix, hull)
 
 # create polygon
 poly = Polygon(hull)
-plt.plot(*poly.exterior.xy)
+# plt.plot(*poly.exterior.xy)
 
 import fiona
 from fiona.crs import from_epsg
@@ -123,21 +121,72 @@ x_max = np.max(matrix[:,0])
 y_min = np.min(matrix[:,1])
 y_max = np.max(matrix[:,1])
 
-x_res = 100
-y_res = 100
-     
-command = 'gdal_grid -zfield "Alt" -txe {x_min} {x_max} -tye {y_min} {y_max} -tr {x_res} {y_res} -l {csv_in} {vrt_in} {ras_out}'
-os.system(command.format(x_min=x_min, x_max=x_max, y_min=y_min, y_max=y_max, x_res=x_res, y_res=y_res, 
+x_res = 10
+y_res = 10
+
+no_data_val = -999
+
+# create a raster with linear interpolation     
+command = 'gdal_grid -zfield "Alt" -a linear:radius=0.0:nodata={no_data_val} -ot Float32 \
+            -txe {x_min} {x_max} -tye {y_min} {y_max} \
+            -tr {x_res} {y_res} -l {csv_in} {vrt_in} {ras_out} \
+            --config GDAL_NUM_THREADS ALL_CPUS'
+
+os.system(command.format(no_data_val=no_data_val, x_min=x_min, x_max=x_max, 
+                         y_min=y_min, y_max=y_max, x_res=x_res, y_res=y_res, 
                          csv_in=csv_in, vrt_in=vrt_in, ras_out=ras_out))
 
 # call and run gdalwarp to clip the raster and add no data value
 cut_cl = str(out_poly_name)
 cut_call = str(out_poly_name)+'.shp'
 ras_clip = str(concave_name)+'_clipped'+'.tif'
-no_data_val = -999
 
-command_warp = 'gdalwarp -overwrite -of GTiff -cutline {cut_call} -cl {cut_cl} -crop_to_cutline -dstnodata {no_data_val} {ras_out} {ras_clip}'
+command_warp = 'gdalwarp -overwrite -of GTiff -cutline {cut_call} -cl {cut_cl} \
+                -crop_to_cutline -dstnodata {no_data_val} {ras_out} {ras_clip}'
 os.system(command_warp.format(cut_call=cut_call, cut_cl=cut_cl, no_data_val=no_data_val, 
                               ras_out=ras_out, ras_clip=ras_clip))
 
 #%% Integrate raster tiling with IF to delete nodata tiled raster
+out_path = "D:/Git/d3d_meso/tests/outputTests/"
+output_filename = "tile_"
+
+tile_size_x = 20000 # it is now in meter or pixel if we use script (the last one)
+tile_size_y = 20000 # which reads info in pixel
+
+## Set and arrange projection
+# Convert the projection with gdal warp
+# prep_conv_out = str(out_path) + str(os.path.splitext(input_filename)[0]) + "_UTM" + ".tif"   
+
+ds = gdal.Open(ras_clip)
+gt = ds.GetGeoTransform()
+band = ds.GetRasterBand(1)
+# stats = band.GetStatistics(True,True) # results = min, max, mean, StdDev
+# stats[1]-stats[0] = max-min
+xsize = band.XSize
+ysize = band.YSize
+# get coordinates of upper left corner
+xmin = gt[0]
+ymax = gt[3]
+res = gt[1]
+
+# determine total length of raster
+xlen = res * ds.RasterXSize
+ylen = res * ds.RasterYSize
+
+# size of a single tile
+xsize_tile = int(tile_size_x/res) #num of pixels in tile_size_x
+ysize_tile = int(tile_size_y/res) ##num of pixels in tile_size_y
+
+# ----------------------------------
+
+# Tile the raster domain as the prefered tile size in meter
+for i in range(0, xsize, xsize_tile):
+    for j in range(0, ysize, ysize_tile):
+        prep_out = str(out_path) + str(output_filename) + str(i) + "_" + str(j) + ".tif"        
+        command = 'gdal_translate -of GTIFF -srcwin {i}, {j}, {xsize_tile}, \
+            {ysize_tile} {prep_conv_out} {prep_out}'
+        os.system(command.format(i=i, j=j, xsize_tile=xsize_tile, ysize_tile=ysize_tile, 
+                                 prep_conv_out=ras_clip, prep_out=prep_out))
+        # below is to filter and delete the grid with all nodata value
+        nodataraster(prep_out)
+
