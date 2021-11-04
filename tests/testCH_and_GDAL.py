@@ -11,6 +11,9 @@ However, a csv from point should be created first along with the .vrt
 2) gdalwarp to cut the raster based on the shp (concave)
 
 3) build script to detect max min of no data and delete the tile
+
+TO DO: modify the script as function to be able to read more variables 
+        adapt testScatter2Grid_and_Rasterize.py
 """
 #%% This script is from testCreateMatrix
 import os
@@ -146,11 +149,11 @@ command_warp = 'gdalwarp -overwrite -of GTiff -cutline {cut_call} -cl {cut_cl} \
 os.system(command_warp.format(cut_call=cut_call, cut_cl=cut_cl, no_data_val=no_data_val, 
                               ras_out=ras_out, ras_clip=ras_clip))
 
-#%% Integrate raster tiling with IF to delete nodata tiled raster
+#%% Tile the raster and filter + delete nodata tiled raster
 out_path = "D:/Git/d3d_meso/tests/outputTests/"
 output_filename = "tile_"
 
-tile_size_x = 20000 # it is now in meter or pixel if we use script (the last one)
+tile_size_x = 20000 # it is in meter 
 tile_size_y = 20000 # which reads info in pixel
 
 ## Set and arrange projection
@@ -170,14 +173,12 @@ ymax = gt[3]
 res = gt[1]
 
 # determine total length of raster
-xlen = res * ds.RasterXSize
+xlen = res * ds.RasterXSize # convert the size in meter to number of pixels
 ylen = res * ds.RasterYSize
 
 # size of a single tile
 xsize_tile = int(tile_size_x/res) #num of pixels in tile_size_x
 ysize_tile = int(tile_size_y/res) ##num of pixels in tile_size_y
-
-# ----------------------------------
 
 # Tile the raster domain as the prefered tile size in meter
 for i in range(0, xsize, xsize_tile):
