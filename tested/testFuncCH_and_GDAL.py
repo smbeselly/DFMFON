@@ -12,7 +12,7 @@ This is the preparation script that is able to:
         as raster and clipped based on number 2
     4. The raster can be tiled to particular size
 """
-#%% This script is from testCreateMatrix
+#%% Import packages and set the file
 import os
 import numpy as np
 import numpy.ma as ma
@@ -80,4 +80,7 @@ ras_clip = os.path.join(out_path+concave_name+affix+'.tif')
 tile_size_x = 20000 # it is in meter 
 tile_size_y = 20000 # which reads info in pixel
 
-d3dRaster2Tiles(out_path, output_filename, ras_clip, tile_size_x, tile_size_y)
+d3dRaster2Tiles(out_path, output_filename, ras_clip, tile_size_x, tile_size_y,CreateSHP=True)
+
+import gc
+gc.collect() # to clear memory of variables in python after doing del(variables)

@@ -4,8 +4,7 @@ Created on Tue Oct 26 21:12:08 2021
 
 @author: sbe002
 
-TO DO: modify the script as function to be able to read more variables 
-        adapt testScatter2Grid_and_Rasterize.py
+This is the accompaying function to process the preparation for D3DFM-MesoFON
 """
 
 import os
@@ -15,11 +14,22 @@ from dfm_tools.get_nc import get_netdata
 from shapely.geometry import mapping, Polygon
 from osgeo import gdal
 import ConcaveHull as CH
-from nodataraster import nodataraster
 
 #%% Create ConcaveHull for nc_input
 
 def d3dConcaveHull(nc_in,k_hull):
+    """Read the UGrid = mesh2d_node_x and mesh2d+node_y
+    and create ConcaveHull Polygon
+    
+    Parameters
+    ---------
+    nc_in = netCDF UGrid file (both old and new UGrid)
+    k_hull = k value to build Concave Hull
+    
+    Returns
+    ---------
+    Concave Hull Polygon Object
+    """
 
     file_nc = nc_in
     
@@ -43,6 +53,19 @@ def d3dConcaveHull(nc_in,k_hull):
 
 #%% Create SHP from Polygon
 def d3dPolySHP(poly_in, dir_out, out_poly_name, projection):
+    """Create Shapefile from shapely polygon feature
+    
+    Parameters
+    ---------
+    poly_in = Polygon file
+    dir_out = Output directory
+    out_poly_name = name of the shapefile as string
+    projection = EPSG Code as string
+    
+    Returns
+    ---------
+    Shapefile with 'out_poly_name.shp'
+    """
     import fiona
     from fiona.crs import from_epsg
     # output location
@@ -66,6 +89,25 @@ def d3dPolySHP(poly_in, dir_out, out_poly_name, projection):
 
 #%% Create CSV build raster and clip
 def d3dCSV2ClippedRaster(concave_path, concave_name, EPSG_coord, matrix, x_res, y_res, no_data_val, shp_clip, affix):
+    """Create raster from the np.array/ matrix and clip the raster based on shapefile
+        
+    Parameters
+    ---------
+    concave_path = path to the output folder
+    concave_name = name of the created raster in string
+    EPSG_coord = EPSG Code as string
+    matrix = data matrix as np.array in x,y,z
+    x_res = x axis resolution in meter
+    y_res = y axis resolution in meter
+    no_data_val = define no data value
+    shp_clip = refer to the shapefile source as mask
+    affix = define the affix of the clipped raster in string
+    
+    Returns
+    ---------
+    Raster from Matrix and
+    Clipped Raster
+    """
 
     np.savetxt(str(concave_path)+str(concave_name)+'.csv', matrix, fmt="%f", delimiter=",", header='Lon,Lat,Alt',comments='')
     
@@ -118,7 +160,24 @@ def d3dCSV2ClippedRaster(concave_path, concave_name, EPSG_coord, matrix, x_res, 
 
 #%% Tile the raster and filter + delete nodata tiled raster
  
-def d3dRaster2Tiles(out_path, output_filename, ras_clip, tile_size_x, tile_size_y):
+def d3dRaster2Tiles(out_path, output_filename, ras_clip, tile_size_x, tile_size_y, CreateSHP=True):
+    """Create tiles of raster tiles of shapefile
+        
+    Parameters
+    ---------
+    out_path = path to save the file
+    output_filename = name of the tiled rasters in string
+    ras_clip = original clipped raster to be tiled
+    tile_size_x = resolution of the tile in x direction in meter
+    tile_size_y = resolution of the tile in y direction in meter
+    CreateSHP = boolean, set True if you want to create SHP, set False for no SHP
+    
+    
+    Returns
+    ---------
+    Tiles of the clipped raster
+    and tiles of shapefile of the clipped raster if CreateSHP=True
+    """
     ds = gdal.Open(ras_clip)
     gt = ds.GetGeoTransform()
     band = ds.GetRasterBand(1)
@@ -148,4 +207,30 @@ def d3dRaster2Tiles(out_path, output_filename, ras_clip, tile_size_x, tile_size_
             os.system(command.format(i=i, j=j, xsize_tile=xsize_tile, ysize_tile=ysize_tile, 
                                      prep_conv_out=ras_clip, prep_out=prep_out))
             # below is to filter and delete the grid with all nodata value
-            nodataraster(prep_out)
+            dss = gdal.Open(prep_out)
+            bands = dss.GetRasterBand(1)
+            statss = bands.GetStatistics(True,True)
+            if statss[0]!=statss[1]:
+                #build shapefile
+                if CreateSHP == True:
+                    import rasterio as rio
+                    dt = rio.open(prep_out)
+                    crs_raster= dt.crs
+                    left,bottom, right, top = dt.bounds #[left, bottom, right, top]
+                    # Create Shapefile  
+                    from shapely.geometry import box
+                    poly_ras= box(left, bottom, right, top) #create poly box
+                    # plt.plot(*poly_ras.exterior.xy)
+                    out_poly_namet = str(output_filename) + str(i) + "_" + str(j)
+                    d3dPolySHP(poly_ras, out_path, out_poly_namet, str(crs_raster)[5:])
+                    del(dt, crs_raster, left, bottom, right, top, poly_ras)
+                    # import gc 
+                    # gc.collect()
+                # deleting variables
+                del(dss,bands,statss,prep_out)
+                
+            else:    
+                del(dss,bands,statss)
+                prep_del = prep_out
+                del(prep_out)
+                os.remove(str(prep_del))
