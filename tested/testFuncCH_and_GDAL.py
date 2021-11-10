@@ -28,9 +28,9 @@ from d3d_prep_raster import d3dConcaveHull, d3dPolySHP, d3dCSV2ClippedRaster, d3
 #uncomment the line below, copy data locally and change this path to increase performance
 #dir_testinput = os.path.join(r'n:\Deltabox\Bulletin\veenstra\info dfm_tools\test_input')
 # dir_testinput = os.path.join(r'D:\Delft3D FM\Tutorial_D-Flow_FM\tutorial09\tutorial09.dsproj_data\westerscheldt01')
-# file_nc_map = os.path.join(dir_testinput,'output','westerscheldt01_map.nc')
-# file_nc_his = os.path.join(dir_testinput,'output','westerscheldt01_his.nc')
-file_nc_ori = os.path.join(r'D:\Delft3D FM\Tutorial_D-Flow_FM\tutorial09\tutorial09.dsproj_data\westerscheldt01\input\westerscheldt_net.nc')
+file_nc_map = os.path.join(r'D:\IDM\Tutorial Data - Delft3D FM Suite 2022.01\Tutorial_D-Flow_FM\New_UGrid\Project1.dsproj_data\FlowFM\output\FlowFM_map.nc')
+file_nc_his = os.path.join(r'D:\IDM\Tutorial Data - Delft3D FM Suite 2022.01\Tutorial_D-Flow_FM\New_UGrid\Project1.dsproj_data\FlowFM\output\FlowFM_his.nc')
+file_nc_ori = os.path.join(r'D:\IDM\Tutorial Data - Delft3D FM Suite 2022.01\Tutorial_D-Flow_FM\New_UGrid\Project1.dsproj_data\FlowFM\input\westernscheldt04_net.nc')
 
 #%% Import the nc file, create hull, and build poly
 nc_in = file_nc_ori
