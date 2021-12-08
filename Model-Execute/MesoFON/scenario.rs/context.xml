@@ -1,0 +1,12 @@
+<context id="meso_FON" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://repast.org/scenario/context">
+  	<context id="meso_FONSpace">
+		<projection type="continuous space" id="space"></projection>
+		<projection type="value layer" id="abovegroundEnv"></projection>
+		<projection type="value layer" id="belowgroundEnv"></projection>
+		<projection type="value layer" id="salinityEnv"></projection>
+		<projection type="continuous space" id="space3d"></projection>
+		<projection type="value layer" id="abovegroundIntensity"></projection>
+		<projection type="value layer" id="belowgroundIntensity"></projection>
+		<projection type="network" id="displacementNetwork"></projection>
+	</context>
+</context>

@@ -1,0 +1,71 @@
+<repast.simphony.data2.engine.DataSetDescriptor simphonyVersion="2.7.0">
+  <name>Tree Traits</name>
+  <type>NON_AGGREGATE</type>
+  <sourceType>meso_FON.application.PlantAgent</sourceType>
+  <inclTick>true</inclTick>
+  <inclBatchRun>true</inclBatchRun>
+  <inclRandomSeed>true</inclRandomSeed>
+  <scheduleParams>
+    <start>0.0</start>
+    <interval>0.25</interval>
+    <priority>-Infinity</priority>
+    <pType>LAST</pType>
+    <duration>-1.0</duration>
+    <frequency>REPEAT</frequency>
+    <hashCode>-1556578174</hashCode>
+  </scheduleParams>
+  <atEnd>false</atEnd>
+  <methodDataSources class="linked-hash-map">
+    <entry>
+      <string>GeoRefPosX</string>
+      <repast.simphony.data2.engine.MethodDataSourceDefinition>
+        <id>GeoRefPosX</id>
+        <className>meso_FON.application.PlantAgent</className>
+        <methodName>getGeoRefPosX</methodName>
+      </repast.simphony.data2.engine.MethodDataSourceDefinition>
+    </entry>
+    <entry>
+      <string>GeoRefPosY</string>
+      <repast.simphony.data2.engine.MethodDataSourceDefinition>
+        <id>GeoRefPosY</id>
+        <className>meso_FON.application.PlantAgent</className>
+        <methodName>getGeoRefPosY</methodName>
+      </repast.simphony.data2.engine.MethodDataSourceDefinition>
+    </entry>
+    <entry>
+      <string>dbh_cm</string>
+      <repast.simphony.data2.engine.MethodDataSourceDefinition>
+        <id>dbh_cm</id>
+        <className>meso_FON.application.PlantAgent</className>
+        <methodName>dbh_cm</methodName>
+      </repast.simphony.data2.engine.MethodDataSourceDefinition>
+    </entry>
+    <entry>
+      <string>Age</string>
+      <repast.simphony.data2.engine.MethodDataSourceDefinition>
+        <id>Age</id>
+        <className>meso_FON.application.PlantAgent</className>
+        <methodName>getAge</methodName>
+      </repast.simphony.data2.engine.MethodDataSourceDefinition>
+    </entry>
+    <entry>
+      <string>Height_cm</string>
+      <repast.simphony.data2.engine.MethodDataSourceDefinition>
+        <id>Height_cm</id>
+        <className>meso_FON.application.PlantAgent</className>
+        <methodName>getHeight_cm</methodName>
+      </repast.simphony.data2.engine.MethodDataSourceDefinition>
+    </entry>
+    <entry>
+      <string>Species</string>
+      <repast.simphony.data2.engine.MethodDataSourceDefinition>
+        <id>Species</id>
+        <className>meso_FON.application.PlantAgent</className>
+        <methodName>getSpecies</methodName>
+      </repast.simphony.data2.engine.MethodDataSourceDefinition>
+    </entry>
+  </methodDataSources>
+  <countSources class="linked-hash-map"/>
+  <customNADataSources class="linked-hash-map"/>
+  <customAggDataSources class="linked-hash-map"/>
+</repast.simphony.data2.engine.DataSetDescriptor>

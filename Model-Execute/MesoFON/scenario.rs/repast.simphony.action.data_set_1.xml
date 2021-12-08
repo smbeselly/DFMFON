@@ -1,0 +1,526 @@
+<repast.simphony.data2.engine.DataSetDescriptor simphonyVersion="2.7.0">
+  <name>Canopy Traits</name>
+  <type>AGGREGATE</type>
+  <inclTick>true</inclTick>
+  <inclBatchRun>true</inclBatchRun>
+  <inclRandomSeed>true</inclRandomSeed>
+  <scheduleParams>
+    <start>0.0</start>
+    <interval>0.25</interval>
+    <priority>-Infinity</priority>
+    <pType>LAST</pType>
+    <duration>-1.0</duration>
+    <frequency>REPEAT</frequency>
+    <hashCode>-1556578174</hashCode>
+  </scheduleParams>
+  <atEnd>false</atEnd>
+  <methodDataSources class="linked-hash-map">
+    <entry>
+      <string>Count Dead Total</string>
+      <repast.simphony.data2.engine.MethodDataSourceDefinition>
+        <id>Count Dead Total</id>
+        <className>meso_FON.application.CanopyFacadeAgent</className>
+        <methodName>getCountDead</methodName>
+        <aggType>MEAN</aggType>
+      </repast.simphony.data2.engine.MethodDataSourceDefinition>
+    </entry>
+    <entry>
+      <string>Count Dead Spec1</string>
+      <repast.simphony.data2.engine.MethodDataSourceDefinition>
+        <id>Count Dead Spec1</id>
+        <className>meso_FON.application.CanopyFacadeAgent</className>
+        <methodName>getCountDead_spec1</methodName>
+        <aggType>MEAN</aggType>
+      </repast.simphony.data2.engine.MethodDataSourceDefinition>
+    </entry>
+    <entry>
+      <string>Count Dead Spec2</string>
+      <repast.simphony.data2.engine.MethodDataSourceDefinition>
+        <id>Count Dead Spec2</id>
+        <className>meso_FON.application.CanopyFacadeAgent</className>
+        <methodName>getCountDead_spec2</methodName>
+        <aggType>MEAN</aggType>
+      </repast.simphony.data2.engine.MethodDataSourceDefinition>
+    </entry>
+    <entry>
+      <string>Count Dead Spec3</string>
+      <repast.simphony.data2.engine.MethodDataSourceDefinition>
+        <id>Count Dead Spec3</id>
+        <className>meso_FON.application.CanopyFacadeAgent</className>
+        <methodName>getCountDead_spec3</methodName>
+        <aggType>MEAN</aggType>
+      </repast.simphony.data2.engine.MethodDataSourceDefinition>
+    </entry>
+    <entry>
+      <string>DBH100 Total</string>
+      <repast.simphony.data2.engine.MethodDataSourceDefinition>
+        <id>DBH100 Total</id>
+        <className>meso_FON.application.CanopyFacadeAgent</className>
+        <methodName>getDbh100_m</methodName>
+        <aggType>MEAN</aggType>
+      </repast.simphony.data2.engine.MethodDataSourceDefinition>
+    </entry>
+    <entry>
+      <string>DBH100 Spec1</string>
+      <repast.simphony.data2.engine.MethodDataSourceDefinition>
+        <id>DBH100 Spec1</id>
+        <className>meso_FON.application.CanopyFacadeAgent</className>
+        <methodName>getDbh100_spec1_m</methodName>
+        <aggType>MEAN</aggType>
+      </repast.simphony.data2.engine.MethodDataSourceDefinition>
+    </entry>
+    <entry>
+      <string>DBH100 Spec2</string>
+      <repast.simphony.data2.engine.MethodDataSourceDefinition>
+        <id>DBH100 Spec2</id>
+        <className>meso_FON.application.CanopyFacadeAgent</className>
+        <methodName>getDbh100_spec2_m</methodName>
+        <aggType>MEAN</aggType>
+      </repast.simphony.data2.engine.MethodDataSourceDefinition>
+    </entry>
+    <entry>
+      <string>DBH100 Spec3</string>
+      <repast.simphony.data2.engine.MethodDataSourceDefinition>
+        <id>DBH100 Spec3</id>
+        <className>meso_FON.application.CanopyFacadeAgent</className>
+        <methodName>getDbh100_spec3_m</methodName>
+        <aggType>MEAN</aggType>
+      </repast.simphony.data2.engine.MethodDataSourceDefinition>
+    </entry>
+    <entry>
+      <string>Density Total</string>
+      <repast.simphony.data2.engine.MethodDataSourceDefinition>
+        <id>Density Total</id>
+        <className>meso_FON.application.CanopyFacadeAgent</className>
+        <methodName>getDensity_per_ha</methodName>
+        <aggType>MEAN</aggType>
+      </repast.simphony.data2.engine.MethodDataSourceDefinition>
+    </entry>
+    <entry>
+      <string>Density Spec1</string>
+      <repast.simphony.data2.engine.MethodDataSourceDefinition>
+        <id>Density Spec1</id>
+        <className>meso_FON.application.CanopyFacadeAgent</className>
+        <methodName>getDensity_spec1_per_ha</methodName>
+        <aggType>MEAN</aggType>
+      </repast.simphony.data2.engine.MethodDataSourceDefinition>
+    </entry>
+    <entry>
+      <string>Density Spec2</string>
+      <repast.simphony.data2.engine.MethodDataSourceDefinition>
+        <id>Density Spec2</id>
+        <className>meso_FON.application.CanopyFacadeAgent</className>
+        <methodName>getDensity_spec2_per_ha</methodName>
+        <aggType>MEAN</aggType>
+      </repast.simphony.data2.engine.MethodDataSourceDefinition>
+    </entry>
+    <entry>
+      <string>Density Spec3</string>
+      <repast.simphony.data2.engine.MethodDataSourceDefinition>
+        <id>Density Spec3</id>
+        <className>meso_FON.application.CanopyFacadeAgent</className>
+        <methodName>getDensity_spec3_per_ha</methodName>
+        <aggType>MEAN</aggType>
+      </repast.simphony.data2.engine.MethodDataSourceDefinition>
+    </entry>
+    <entry>
+      <string>Dq Total</string>
+      <repast.simphony.data2.engine.MethodDataSourceDefinition>
+        <id>Dq Total</id>
+        <className>meso_FON.application.CanopyFacadeAgent</className>
+        <methodName>getDq_m</methodName>
+        <aggType>MEAN</aggType>
+      </repast.simphony.data2.engine.MethodDataSourceDefinition>
+    </entry>
+    <entry>
+      <string>Dq Spec1</string>
+      <repast.simphony.data2.engine.MethodDataSourceDefinition>
+        <id>Dq Spec1</id>
+        <className>meso_FON.application.CanopyFacadeAgent</className>
+        <methodName>getDq_spec1_m</methodName>
+        <aggType>MEAN</aggType>
+      </repast.simphony.data2.engine.MethodDataSourceDefinition>
+    </entry>
+    <entry>
+      <string>Dq Spec2</string>
+      <repast.simphony.data2.engine.MethodDataSourceDefinition>
+        <id>Dq Spec2</id>
+        <className>meso_FON.application.CanopyFacadeAgent</className>
+        <methodName>getDq_spec2_m</methodName>
+        <aggType>MEAN</aggType>
+      </repast.simphony.data2.engine.MethodDataSourceDefinition>
+    </entry>
+    <entry>
+      <string>DQ Spec3</string>
+      <repast.simphony.data2.engine.MethodDataSourceDefinition>
+        <id>DQ Spec3</id>
+        <className>meso_FON.application.CanopyFacadeAgent</className>
+        <methodName>getDq_spec2_m</methodName>
+        <aggType>MEAN</aggType>
+      </repast.simphony.data2.engine.MethodDataSourceDefinition>
+    </entry>
+    <entry>
+      <string>H100 Total</string>
+      <repast.simphony.data2.engine.MethodDataSourceDefinition>
+        <id>H100 Total</id>
+        <className>meso_FON.application.CanopyFacadeAgent</className>
+        <methodName>getH100_m</methodName>
+        <aggType>MEAN</aggType>
+      </repast.simphony.data2.engine.MethodDataSourceDefinition>
+    </entry>
+    <entry>
+      <string>H100 Spec1</string>
+      <repast.simphony.data2.engine.MethodDataSourceDefinition>
+        <id>H100 Spec1</id>
+        <className>meso_FON.application.CanopyFacadeAgent</className>
+        <methodName>getH100_spec1_m</methodName>
+        <aggType>MEAN</aggType>
+      </repast.simphony.data2.engine.MethodDataSourceDefinition>
+    </entry>
+    <entry>
+      <string>H100 Spec2</string>
+      <repast.simphony.data2.engine.MethodDataSourceDefinition>
+        <id>H100 Spec2</id>
+        <className>meso_FON.application.CanopyFacadeAgent</className>
+        <methodName>getH100_spec2_m</methodName>
+        <aggType>MEAN</aggType>
+      </repast.simphony.data2.engine.MethodDataSourceDefinition>
+    </entry>
+    <entry>
+      <string>H100 Spec3</string>
+      <repast.simphony.data2.engine.MethodDataSourceDefinition>
+        <id>H100 Spec3</id>
+        <className>meso_FON.application.CanopyFacadeAgent</className>
+        <methodName>getH100_spec3_m</methodName>
+        <aggType>MEAN</aggType>
+      </repast.simphony.data2.engine.MethodDataSourceDefinition>
+    </entry>
+    <entry>
+      <string>H Total</string>
+      <repast.simphony.data2.engine.MethodDataSourceDefinition>
+        <id>H Total</id>
+        <className>meso_FON.application.CanopyFacadeAgent</className>
+        <methodName>getH_m</methodName>
+        <aggType>MEAN</aggType>
+      </repast.simphony.data2.engine.MethodDataSourceDefinition>
+    </entry>
+    <entry>
+      <string>H Spec1</string>
+      <repast.simphony.data2.engine.MethodDataSourceDefinition>
+        <id>H Spec1</id>
+        <className>meso_FON.application.CanopyFacadeAgent</className>
+        <methodName>getH_spec1_m</methodName>
+        <aggType>MEAN</aggType>
+      </repast.simphony.data2.engine.MethodDataSourceDefinition>
+    </entry>
+    <entry>
+      <string>H Spec2</string>
+      <repast.simphony.data2.engine.MethodDataSourceDefinition>
+        <id>H Spec2</id>
+        <className>meso_FON.application.CanopyFacadeAgent</className>
+        <methodName>getH_spec2_m</methodName>
+        <aggType>MEAN</aggType>
+      </repast.simphony.data2.engine.MethodDataSourceDefinition>
+    </entry>
+    <entry>
+      <string>H Spec3</string>
+      <repast.simphony.data2.engine.MethodDataSourceDefinition>
+        <id>H Spec3</id>
+        <className>meso_FON.application.CanopyFacadeAgent</className>
+        <methodName>getH_spec3_m</methodName>
+        <aggType>MEAN</aggType>
+      </repast.simphony.data2.engine.MethodDataSourceDefinition>
+    </entry>
+    <entry>
+      <string>SBA Total</string>
+      <repast.simphony.data2.engine.MethodDataSourceDefinition>
+        <id>SBA Total</id>
+        <className>meso_FON.application.CanopyFacadeAgent</className>
+        <methodName>getSba_m2</methodName>
+        <aggType>MEAN</aggType>
+      </repast.simphony.data2.engine.MethodDataSourceDefinition>
+    </entry>
+    <entry>
+      <string>SBA Spec1</string>
+      <repast.simphony.data2.engine.MethodDataSourceDefinition>
+        <id>SBA Spec1</id>
+        <className>meso_FON.application.CanopyFacadeAgent</className>
+        <methodName>getSba_spec1_m2</methodName>
+        <aggType>MEAN</aggType>
+      </repast.simphony.data2.engine.MethodDataSourceDefinition>
+    </entry>
+    <entry>
+      <string>SBA Spec2</string>
+      <repast.simphony.data2.engine.MethodDataSourceDefinition>
+        <id>SBA Spec2</id>
+        <className>meso_FON.application.CanopyFacadeAgent</className>
+        <methodName>getSba_spec2_m2</methodName>
+        <aggType>MEAN</aggType>
+      </repast.simphony.data2.engine.MethodDataSourceDefinition>
+    </entry>
+    <entry>
+      <string>SBA Spec3</string>
+      <repast.simphony.data2.engine.MethodDataSourceDefinition>
+        <id>SBA Spec3</id>
+        <className>meso_FON.application.CanopyFacadeAgent</className>
+        <methodName>getSba_spec3_m2</methodName>
+        <aggType>MEAN</aggType>
+      </repast.simphony.data2.engine.MethodDataSourceDefinition>
+    </entry>
+    <entry>
+      <string>V Total</string>
+      <repast.simphony.data2.engine.MethodDataSourceDefinition>
+        <id>V Total</id>
+        <className>meso_FON.application.CanopyFacadeAgent</className>
+        <methodName>getV_m3</methodName>
+        <aggType>MEAN</aggType>
+      </repast.simphony.data2.engine.MethodDataSourceDefinition>
+    </entry>
+    <entry>
+      <string>V Spec1</string>
+      <repast.simphony.data2.engine.MethodDataSourceDefinition>
+        <id>V Spec1</id>
+        <className>meso_FON.application.CanopyFacadeAgent</className>
+        <methodName>getV_spec1_m3</methodName>
+        <aggType>MEAN</aggType>
+      </repast.simphony.data2.engine.MethodDataSourceDefinition>
+    </entry>
+    <entry>
+      <string>V Spec2</string>
+      <repast.simphony.data2.engine.MethodDataSourceDefinition>
+        <id>V Spec2</id>
+        <className>meso_FON.application.CanopyFacadeAgent</className>
+        <methodName>getV_spec2_m3</methodName>
+        <aggType>MEAN</aggType>
+      </repast.simphony.data2.engine.MethodDataSourceDefinition>
+    </entry>
+    <entry>
+      <string>V_Spec3</string>
+      <repast.simphony.data2.engine.MethodDataSourceDefinition>
+        <id>V_Spec3</id>
+        <className>meso_FON.application.CanopyFacadeAgent</className>
+        <methodName>getV_spec3_m3</methodName>
+        <aggType>MEAN</aggType>
+      </repast.simphony.data2.engine.MethodDataSourceDefinition>
+    </entry>
+    <entry>
+      <string>Comp_Sp1&gt;Sp1</string>
+      <repast.simphony.data2.engine.MethodDataSourceDefinition>
+        <id>Comp_Sp1&gt;Sp1</id>
+        <className>meso_FON.application.CanopyFacadeAgent</className>
+        <methodName>getAvgCompetition_spec1_on_spec1</methodName>
+        <aggType>MEAN</aggType>
+      </repast.simphony.data2.engine.MethodDataSourceDefinition>
+    </entry>
+    <entry>
+      <string>Comp_Sp2&gt;Sp1</string>
+      <repast.simphony.data2.engine.MethodDataSourceDefinition>
+        <id>Comp_Sp2&gt;Sp1</id>
+        <className>meso_FON.application.CanopyFacadeAgent</className>
+        <methodName>getAvgCompetition_spec2_on_spec1</methodName>
+        <aggType>MEAN</aggType>
+      </repast.simphony.data2.engine.MethodDataSourceDefinition>
+    </entry>
+    <entry>
+      <string>Comp_Sp3&gt;Sp1</string>
+      <repast.simphony.data2.engine.MethodDataSourceDefinition>
+        <id>Comp_Sp3&gt;Sp1</id>
+        <className>meso_FON.application.CanopyFacadeAgent</className>
+        <methodName>getAvgCompetition_spec3_on_spec1</methodName>
+        <aggType>MEAN</aggType>
+      </repast.simphony.data2.engine.MethodDataSourceDefinition>
+    </entry>
+    <entry>
+      <string>NormComp_Sp1&gt;Sp1</string>
+      <repast.simphony.data2.engine.MethodDataSourceDefinition>
+        <id>NormComp_Sp1&gt;Sp1</id>
+        <className>meso_FON.application.CanopyFacadeAgent</className>
+        <methodName>getAvgNormCompetition_spec1_on_spec1</methodName>
+        <aggType>MEAN</aggType>
+      </repast.simphony.data2.engine.MethodDataSourceDefinition>
+    </entry>
+    <entry>
+      <string>NormComp_Sp2&gt;Sp1</string>
+      <repast.simphony.data2.engine.MethodDataSourceDefinition>
+        <id>NormComp_Sp2&gt;Sp1</id>
+        <className>meso_FON.application.CanopyFacadeAgent</className>
+        <methodName>getAvgNormCompetition_spec2_on_spec1</methodName>
+        <aggType>MEAN</aggType>
+      </repast.simphony.data2.engine.MethodDataSourceDefinition>
+    </entry>
+    <entry>
+      <string>NormComp_Sp3&gt;Sp1</string>
+      <repast.simphony.data2.engine.MethodDataSourceDefinition>
+        <id>NormComp_Sp3&gt;Sp1</id>
+        <className>meso_FON.application.CanopyFacadeAgent</className>
+        <methodName>getAvgNormCompetition_spec3_on_spec1</methodName>
+        <aggType>MEAN</aggType>
+      </repast.simphony.data2.engine.MethodDataSourceDefinition>
+    </entry>
+    <entry>
+      <string>IntraComp_Sp1</string>
+      <repast.simphony.data2.engine.MethodDataSourceDefinition>
+        <id>IntraComp_Sp1</id>
+        <className>meso_FON.application.CanopyFacadeAgent</className>
+        <methodName>getAvgIntraSpeciesCompetition_spec1</methodName>
+        <aggType>MEAN</aggType>
+      </repast.simphony.data2.engine.MethodDataSourceDefinition>
+    </entry>
+    <entry>
+      <string>InterComp_Sp1</string>
+      <repast.simphony.data2.engine.MethodDataSourceDefinition>
+        <id>InterComp_Sp1</id>
+        <className>meso_FON.application.CanopyFacadeAgent</className>
+        <methodName>getAvgInterSpeciesCompetition_spec1</methodName>
+        <aggType>MEAN</aggType>
+      </repast.simphony.data2.engine.MethodDataSourceDefinition>
+    </entry>
+    <entry>
+      <string>Comp_Sp1&gt;Sp2</string>
+      <repast.simphony.data2.engine.MethodDataSourceDefinition>
+        <id>Comp_Sp1&gt;Sp2</id>
+        <className>meso_FON.application.CanopyFacadeAgent</className>
+        <methodName>getAvgCompetition_spec1_on_spec2</methodName>
+        <aggType>MEAN</aggType>
+      </repast.simphony.data2.engine.MethodDataSourceDefinition>
+    </entry>
+    <entry>
+      <string>Comp_Sp2&gt;Sp2</string>
+      <repast.simphony.data2.engine.MethodDataSourceDefinition>
+        <id>Comp_Sp2&gt;Sp2</id>
+        <className>meso_FON.application.CanopyFacadeAgent</className>
+        <methodName>getAvgCompetition_spec2_on_spec2</methodName>
+        <aggType>MEAN</aggType>
+      </repast.simphony.data2.engine.MethodDataSourceDefinition>
+    </entry>
+    <entry>
+      <string>Comp_Sp3&gt;Sp2</string>
+      <repast.simphony.data2.engine.MethodDataSourceDefinition>
+        <id>Comp_Sp3&gt;Sp2</id>
+        <className>meso_FON.application.CanopyFacadeAgent</className>
+        <methodName>getAvgCompetition_spec3_on_spec2</methodName>
+        <aggType>MEAN</aggType>
+      </repast.simphony.data2.engine.MethodDataSourceDefinition>
+    </entry>
+    <entry>
+      <string>NormComp_Sp1&gt;Sp2</string>
+      <repast.simphony.data2.engine.MethodDataSourceDefinition>
+        <id>NormComp_Sp1&gt;Sp2</id>
+        <className>meso_FON.application.CanopyFacadeAgent</className>
+        <methodName>getAvgNormCompetition_spec1_on_spec2</methodName>
+        <aggType>MEAN</aggType>
+      </repast.simphony.data2.engine.MethodDataSourceDefinition>
+    </entry>
+    <entry>
+      <string>NormComp_Sp2&gt;Sp2</string>
+      <repast.simphony.data2.engine.MethodDataSourceDefinition>
+        <id>NormComp_Sp2&gt;Sp2</id>
+        <className>meso_FON.application.CanopyFacadeAgent</className>
+        <methodName>getAvgNormCompetition_spec2_on_spec2</methodName>
+        <aggType>MEAN</aggType>
+      </repast.simphony.data2.engine.MethodDataSourceDefinition>
+    </entry>
+    <entry>
+      <string>NormComp_Sp3&gt;Sp2</string>
+      <repast.simphony.data2.engine.MethodDataSourceDefinition>
+        <id>NormComp_Sp3&gt;Sp2</id>
+        <className>meso_FON.application.CanopyFacadeAgent</className>
+        <methodName>getAvgNormCompetition_spec3_on_spec2</methodName>
+        <aggType>MEAN</aggType>
+      </repast.simphony.data2.engine.MethodDataSourceDefinition>
+    </entry>
+    <entry>
+      <string>IntraComp_Sp2</string>
+      <repast.simphony.data2.engine.MethodDataSourceDefinition>
+        <id>IntraComp_Sp2</id>
+        <className>meso_FON.application.CanopyFacadeAgent</className>
+        <methodName>getAvgIntraSpeciesCompetition_spec2</methodName>
+        <aggType>MEAN</aggType>
+      </repast.simphony.data2.engine.MethodDataSourceDefinition>
+    </entry>
+    <entry>
+      <string>InterComp_Sp2</string>
+      <repast.simphony.data2.engine.MethodDataSourceDefinition>
+        <id>InterComp_Sp2</id>
+        <className>meso_FON.application.CanopyFacadeAgent</className>
+        <methodName>getAvgInterSpeciesCompetition_spec2</methodName>
+        <aggType>MEAN</aggType>
+      </repast.simphony.data2.engine.MethodDataSourceDefinition>
+    </entry>
+    <entry>
+      <string>Comp_Sp1&gt;Sp3</string>
+      <repast.simphony.data2.engine.MethodDataSourceDefinition>
+        <id>Comp_Sp1&gt;Sp3</id>
+        <className>meso_FON.application.CanopyFacadeAgent</className>
+        <methodName>getAvgCompetition_spec1_on_spec3</methodName>
+        <aggType>MEAN</aggType>
+      </repast.simphony.data2.engine.MethodDataSourceDefinition>
+    </entry>
+    <entry>
+      <string>Comp_Sp2&gt;Sp3</string>
+      <repast.simphony.data2.engine.MethodDataSourceDefinition>
+        <id>Comp_Sp2&gt;Sp3</id>
+        <className>meso_FON.application.CanopyFacadeAgent</className>
+        <methodName>getAvgCompetition_spec2_on_spec3</methodName>
+        <aggType>MEAN</aggType>
+      </repast.simphony.data2.engine.MethodDataSourceDefinition>
+    </entry>
+    <entry>
+      <string>Comp_Sp3&gt;Sp3</string>
+      <repast.simphony.data2.engine.MethodDataSourceDefinition>
+        <id>Comp_Sp3&gt;Sp3</id>
+        <className>meso_FON.application.CanopyFacadeAgent</className>
+        <methodName>getAvgCompetition_spec3_on_spec3</methodName>
+        <aggType>MEAN</aggType>
+      </repast.simphony.data2.engine.MethodDataSourceDefinition>
+    </entry>
+    <entry>
+      <string>NormComp_Sp1&gt;Sp3</string>
+      <repast.simphony.data2.engine.MethodDataSourceDefinition>
+        <id>NormComp_Sp1&gt;Sp3</id>
+        <className>meso_FON.application.CanopyFacadeAgent</className>
+        <methodName>getAvgNormCompetition_spec1_on_spec3</methodName>
+        <aggType>MEAN</aggType>
+      </repast.simphony.data2.engine.MethodDataSourceDefinition>
+    </entry>
+    <entry>
+      <string>NormComp_Sp2_Sp3</string>
+      <repast.simphony.data2.engine.MethodDataSourceDefinition>
+        <id>NormComp_Sp2_Sp3</id>
+        <className>meso_FON.application.CanopyFacadeAgent</className>
+        <methodName>getAvgNormCompetition_spec2_on_spec3</methodName>
+        <aggType>MEAN</aggType>
+      </repast.simphony.data2.engine.MethodDataSourceDefinition>
+    </entry>
+    <entry>
+      <string>NormComp_Sp3&gt;Sp3</string>
+      <repast.simphony.data2.engine.MethodDataSourceDefinition>
+        <id>NormComp_Sp3&gt;Sp3</id>
+        <className>meso_FON.application.CanopyFacadeAgent</className>
+        <methodName>getAvgNormCompetition_spec3_on_spec3</methodName>
+        <aggType>MEAN</aggType>
+      </repast.simphony.data2.engine.MethodDataSourceDefinition>
+    </entry>
+    <entry>
+      <string>IntraComp_Sp3</string>
+      <repast.simphony.data2.engine.MethodDataSourceDefinition>
+        <id>IntraComp_Sp3</id>
+        <className>meso_FON.application.CanopyFacadeAgent</className>
+        <methodName>getAvgIntraSpeciesCompetition_spec3</methodName>
+        <aggType>MEAN</aggType>
+      </repast.simphony.data2.engine.MethodDataSourceDefinition>
+    </entry>
+    <entry>
+      <string>InterComp_Sp3</string>
+      <repast.simphony.data2.engine.MethodDataSourceDefinition>
+        <id>InterComp_Sp3</id>
+        <className>meso_FON.application.CanopyFacadeAgent</className>
+        <methodName>getAvgInterSpeciesCompetition_spec3</methodName>
+        <aggType>MEAN</aggType>
+      </repast.simphony.data2.engine.MethodDataSourceDefinition>
+    </entry>
+  </methodDataSources>
+  <countSources class="linked-hash-map"/>
+  <customNADataSources class="linked-hash-map"/>
+  <customAggDataSources class="linked-hash-map"/>
+</repast.simphony.data2.engine.DataSetDescriptor>

@@ -8,6 +8,8 @@ This is a temporary script file.
 
 #%%
 # Import the necessary packages
+import pywintypes
+import win32api
 import numpy as np
 import bmi.wrapper
 import ctypes
@@ -23,17 +25,20 @@ faulthandler.enable()
 ## Initiate the BMI Delft3D
 ## Paths for dll-files and input-files for DFM
 D3D_HOME = os.path.join(r'D:\Delft3D FM\FM_Compiled_1.2.8.62485\x64')
-MFON_HOME = os.path.join(r'D:\Program_Files\eclipse-workspace\meso_FON')
-workdir = os.path.join(r'D:\A_PhD\03. Bahan PhD\07. Olah Data\17._BMI_DFM')
+MFON_HOME = os.path.join(r'D:\Git\d3d_meso\Model-Execute\MesoFON')
+workdir = os.path.join(r'D:\Git\d3d_meso\Model-Execute\D3DFM')
 
 # engine and config setting DFM
+# dimr_path = os.path.join(D3D_HOME, 'dimr', 'bin', 'dimr_dll.dll')
 dimr_path = os.path.join(D3D_HOME, 'dimr', 'bin', 'dimr_dll.dll')
+# dimr_path = os.add_dll_directory("${D:\Delft3D FM\FM_Compiled_1.2.8.62485\x64\dimr\bin\dimr_dll.dll}")
 dflowfm_path = os.path.join(D3D_HOME, 'dflowfm', 'bin', 'dflowfm.dll')
+# dflowfm_path = os.add_dll_directory(D3D_HOME, 'dflowfm', 'bin', 'dflowfm.dll')
 config_file = os.path.join(workdir, 'dimr_config.xml')
 
-mdu_file = os.path.join(workdir, 'fm', 'sample.mdu')
-grid_file = os.path.join(workdir, 'fm', 'sample_net.nc')
-figsavefolder= os.path.join(r'D:\A_PhD\03. Bahan PhD\07. Olah Data\17._BMI_DFM\figs')
+mdu_file = os.path.join(workdir, 'dflowfm', 'FlowFM.mdu')
+grid_file = os.path.join(workdir, 'dflowfm', 'schematized_delta_net.nc')
+figsavefolder= os.path.join(r'D:\Git\d3d_meso\Model-Out\D3DFM\Figs')
 
 # engine and config setting MesoFON
 # TODO
@@ -56,6 +61,7 @@ os.environ['PATH'] = os.path.join(D3D_HOME, 'share', 'bin') \
 + ";" + os.path.join(D3D_HOME, 'swan', 'scripts')
 
 ## Define DFM wrapper
+os.chdir(dflowfm_path)
 model_dfm = bmi.wrapper.BMIWrapper(engine=dflowfm_path, configfile=mdu_file)
 
 ## Define and initialise DIMR wrapper
@@ -67,6 +73,13 @@ print ('DFM initialized')
 # model_mfon = bmi.wrapper.BMIWrapper(engine=mfon_path, config_file=mfon_config_file)
 # model_mfon.initialize()
 # print('MesoFON initialized')
+
+import ctypes
+import ctypes.util
+name = ctypes.util.find_library('libuvc')
+lib = ctypes.cdll.LoadLibrary(name)
+
+
 #%%
 ## Read the D3D Domain and Map it to create the 'world' for MesoFON
 

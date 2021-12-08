@@ -1,0 +1,9 @@
+model.archive = F:/Temp/MesoFONbatch_JDK11/Output/complete_model.jar
+batch.params.file = scenario.rs/batch_params.xml
+ssh.key_dir = C:/Users/brian/.ssh
+poll.frequency = 60.0
+model.output = F:/Temp/MesoFONbatch_JDK11/Output
+
+vm.arguments = 
+local.0.instances = 2
+local.0.working_directory = C:/Users/brian/AppData/Local/Temp/

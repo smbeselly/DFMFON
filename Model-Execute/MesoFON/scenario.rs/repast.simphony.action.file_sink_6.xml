@@ -1,0 +1,14 @@
+<repast.simphony.data2.engine.FileSinkDescriptor simphonyVersion="2.7.0">
+  <name>Paraemters Out</name>
+  <dataSet>Model Parameters</dataSet>
+  <delimiter>,</delimiter>
+  <format>TABULAR</format>
+  <sourceIds class="linked-hash-set">
+    <string>random_seed</string>
+    <string>run</string>
+    <string>tick</string>
+    <string>ModelParameters</string>
+  </sourceIds>
+  <fileName>MF_Params_Out.txt</fileName>
+  <addTimeStamp>true</addTimeStamp>
+</repast.simphony.data2.engine.FileSinkDescriptor>

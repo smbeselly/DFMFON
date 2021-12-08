@@ -118,7 +118,7 @@ for filepath in glob.iglob(file_tile_trees): # looping for all with trees affix
     tile_0_read = gpd.read_file(filepath)
     posX = tile_0_read['coord x']
     posY = tile_0_read['coord y']
-    height_m = tile_0_read['CHM_North']
+    height_m = tile_0_read['CHM_North'] #change for independent files or standardized the shp
     id_id = np.arange(len(posX))
     speciesName = np.ones(len(posX))*1 #if only one species is recorded, however it is better to place this in shapefile
     types_species = id_id+1 # this variable starts from 1 to N+1

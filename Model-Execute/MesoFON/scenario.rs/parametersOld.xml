@@ -1,0 +1,310 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<parameters>
+	<parameter name="randomSeed" displayName="9. Default Random Seed"
+		type="int" defaultValue="__NULL__" isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$IntConverter" />
+	<parameter name="formFactor" displayName="4.3.1 Form factors for species"
+		type="java.lang.String" defaultValue="0.65 0.43 0.43" isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$StringStringConverter" />
+	<parameter name="crownRadiusFunction" displayName="3.4.1 Crown Radius Function"
+		type="java.lang.String" defaultValue="9.86 * rbh ^ 0.8158" isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$StringStringConverter" />
+	<parameter name="physiologicalPlasticity" displayName="5.4 Physiological plasticity of species"
+		type="double" defaultValue="0.0" isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$DoubleConverter" />
+	<parameter name="environmentMaxBelow" displayName="1.4.4 Maximum Belowground Environment Level"
+		type="double" defaultValue="0.99" isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$DoubleConverter" />
+	<parameter name="dT_yrs" displayName="1.1.4 Simulation interval in 1/[inserted value] years"
+		type="double" defaultValue="1.0" isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$DoubleConverter" />
+	<parameter name="scheduledMethodStartValEdit" displayName="1.1.4.1 Adjust function simulation start dates to simulation interval in 1/x years"
+		type="boolean" defaultValue="true" isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$BooleanConverter" />
+	<parameter name="salinityMax" displayName="1.4.4.2 Maximum Salinity Level"
+		type="java.lang.String" defaultValue="30.0 30.0 30.0 30.0" isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$StringStringConverter" />
+	<parameter name="facilitation" displayName="2.3.4 Facilitation (Imin Reduction)"
+		type="double" defaultValue="0.0" isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$DoubleConverter" />
+	<parameter name="crownHeightFunction" displayName="3.3.1 Crown Height Function"
+		type="java.lang.String" defaultValue="9.86 * rbh ^ 0.8158" isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$StringStringConverter" />
+	<parameter name="salinityFunction" displayName="3.6 Salinity availability Function"
+		type="java.lang.String" defaultValue="1 / ( 1 + exp( dseg * ( useg - sal )))"
+		isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$StringStringConverter" />
+	<parameter name="environmentType"
+		displayName="1.4.1 Environment Type or Environment PGM File" type="java.lang.String"
+		defaultValue="Uniform" isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$StringStringConverter"
+		values="Uniform Gradient sugarspace.pgm own.pgm " />
+	<parameter name="dragCoefficient" displayName="6.7 Drag coefficient"
+		type="java.lang.String" defaultValue="0.72 0.72 0.72" isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$StringStringConverter" />
+	<parameter name="salinityType" displayName="1.4.2 Salinity Type or Salinity PGM File"
+		type="java.lang.String" defaultValue="Uniform" isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$StringStringConverter"
+		values="Uniform Heterogeneous Gradient sugarspace.pgm ownbelow.pgm " />
+	<parameter name="runForward" displayName="1.1.3 Run Forward"
+		type="boolean" defaultValue="true" isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$BooleanConverter" />
+	<parameter name="shrubDislocation" displayName="2.3.1 Shrub Dislocation"
+		type="boolean" defaultValue="false" isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$BooleanConverter" />
+	<parameter name="survivingMeristems_per_m" displayName="7.5 Surviving meristems [per m]"
+		type="double" defaultValue="7.9" isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$DoubleConverter" />
+	<parameter name="environmentMax" displayName="1.4.3 Maximum Environmental Level"
+		type="double" defaultValue="0.99" isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$DoubleConverter" />
+	<parameter name="growthSpecies3" displayName="4.1.3 Growth Species 3"
+		type="java.lang.String"
+		defaultValue="deltaDmax 0.63 dmax 43.9 hmax 415.33 dseg -0.25 useg 58 c1 0.0 c2 1.33 c3 -0.72"
+		isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$StringStringConverter" />
+	<parameter name="coppiceHeight_m" displayName="7.3 Coppice height [m]"
+		type="double" defaultValue="0.4" isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$DoubleConverter" />
+	<parameter name="numberDispergules" displayName="6.2 Number of dispergules per species"
+		type="java.lang.String" defaultValue="0.0 0.0 0.0" isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$StringStringConverter" />
+	<parameter name="worldLength" displayName="1.2.2 World Length"
+		type="int" defaultValue="200" isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$IntConverter" />
+	<parameter name="growthSpecies1" displayName="4.1.1 Growth Species 1"
+		type="java.lang.String"
+		defaultValue="deltaDmax 1.495 dmaxInit 49.38 hmaxInit 4991.09 dmax 49.38 hmax 4991.09 dseg -0.25 useg 58 c1 0.0 c2 2.1654 c3 -1.17254 redDmaxByAboveCorr 0.0483 redDmaxByBelowCorr 0.2532 redHmaxByAboveCorr -0.1588 redHmaxByBelowCorr 0.0354 width 1.3179"
+		isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$StringStringConverter" />
+	<parameter name="growthSpecies2" displayName="4.1.2 Growth Species 2"
+		type="java.lang.String"
+		defaultValue="deltaDmax 0.63 dmax 43.9 hmax 415.33 dseg -0.25 useg 58 c1 0.0 c2 1.33 c3 -0.72"
+		isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$StringStringConverter" />
+	<parameter name="fonSpecies2belowground"
+		displayName="5.2.2 FON Species 2 belowground (Imax Imin a b)" type="java.lang.String"
+		defaultValue="0.05 0.9999 11.0 0.654" isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$StringStringConverter" />
+	<parameter name="shapeFactor"
+		displayName="6.8 Weibull shape factor for wind distribution" type="double"
+		defaultValue="2.0" isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$DoubleConverter" />
+	<parameter name="physiologicalPlasticityThreshold"
+		displayName="5.5 Threshold for phyiological plasticity" type="double"
+		defaultValue="0.5" isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$DoubleConverter" />
+	<parameter name="fonSpecies2" displayName="5.2.1 FON Species 2 (Imax Imin a b)"
+		type="java.lang.String" defaultValue="0.95 0.07 11.0 0.654"
+		isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$StringStringConverter" />
+	<parameter name="fonSpecies1" displayName="5.1.1 FON Species 1 (Imax Imin a b)"
+		type="java.lang.String" defaultValue="0.6237 0.0391 9.86 0.8158"
+		isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$StringStringConverter" />
+	<parameter name="mortalitySpecies1" displayName="5.7.1 Mortality Species 1 (vThreshold_m3 sustainability_yrs  dominantFraction heightDiffForCutting_cm)"
+		type="java.lang.String" defaultValue="1.8505E-4 31 0.1 5.0"
+		isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$StringStringConverter" />
+	<parameter name="mortalitySpecies2" displayName="5.7.2 Mortality Species 2 (vThreshold_m3 sustainability_yrs  dominantFraction heightDiffForCutting_cm)"
+		type="java.lang.String" defaultValue="0.01 10 0.1 5.0"
+		isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$StringStringConverter" />
+	<parameter name="mortalitySpecies3" displayName="5.7.3 Mortality Species 3 (vThreshold_m3 sustainability_yrs dominantFraction heightDiffForCutting_cm)"
+		type="java.lang.String" defaultValue="0.01 10 0.1 5.0"
+		isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$StringStringConverter" />
+	<parameter name="crownRadiusFunctionShrub" displayName="3.4.2 Crown Radius Function Shrub"
+		type="java.lang.String" defaultValue="8.96 * rbh ^ 0.8158" isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$StringStringConverter" />
+	<parameter name="kSeedWeight_g" displayName="6.3 1000 Seed Weight [g]"
+		type="java.lang.String" defaultValue="10100 10100 10100" isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$StringStringConverter" />
+	<parameter name="updateEnvironment" displayName="1.1.2 Update Environment"
+		type="boolean" defaultValue="false" isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$BooleanConverter" />
+	<parameter name="fonSpecies3" displayName="5.3.1 FON Species 3 (Imax Imin a b)"
+		type="java.lang.String" defaultValue="0.95 0.07 11.0 0.654"
+		isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$StringStringConverter" />
+	<parameter name="speciesNamesInitialNumbers" displayName="1.5 Species Names and Initital Numbers"
+		type="java.lang.String"
+		defaultValue="Rhizophora_apiculata 500 Avicennia_germinans 0 Laguncularia_racemosa 0"
+		isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$StringStringConverter" />
+	<parameter name="heightSpecies2" displayName="4.2.2 Height Species 2"
+		type="java.lang.String" defaultValue="dmax 43.9 hmax 415.33"
+		isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$StringStringConverter" />
+	<parameter name="heightSpecies1" displayName="4.2.1 Height Species 1"
+		type="java.lang.String" defaultValue="dmaxInit 49.38 hmaxInit 4991.09 dmax 49.38 hmax 4991.09 redDmaxByAboveCorr 0.0483 redDmaxByBelowCorr 0.2532 redHmaxByAboveCorr -0.1588 redHmaxByBelowCorr 0.0354 width 1.3179"
+		isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$StringStringConverter" />
+	<parameter name="shrubDislocationFactor" displayName="2.3.5 Shrub Dislocation Factor"
+		type="double" defaultValue="0.09" isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$DoubleConverter" />
+	<parameter name="crownPlasticitySpecies1" displayName="4.4.1 Crown Plasticity Species 1"
+		type="double" defaultValue="0.4" isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$DoubleConverter" />
+	<parameter name="crownPlasticitySpecies2" displayName="4.4.2 Crown Plasticity Species 2"
+		type="double" defaultValue="0.01" isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$DoubleConverter" />
+	<parameter name="crownPlasticitySpecies3" displayName="4.4.3 Crown Plasticity Species 3"
+		type="double" defaultValue="0.01" isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$DoubleConverter" />
+	<parameter name="revCrownPlasticitySpecies1" displayName="4.4.4 CReverse rown Plasticity Species 1"
+		type="double" defaultValue="0.06" isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$DoubleConverter" />
+	<parameter name="revCrownPlasticitySpecies2" displayName="4.4.5 Reverse Crown Plasticity Species 2"
+		type="double" defaultValue="0.01" isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$DoubleConverter" />
+	<parameter name="revCrownPlasticitySpecies3" displayName="4.4.6 Reverse Crown Plasticity Species 3"
+		type="double" defaultValue="0.01" isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$DoubleConverter" />
+	<parameter name="heightSpecies3" displayName="4.2.3 Height Species 3"
+		type="java.lang.String" defaultValue="dmax 43.9 hmax 415.33"
+		isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$StringStringConverter" />
+	<parameter name="excelUse" displayName="1.6 Use Excel-File (*.xls)"
+		type="boolean" defaultValue="false" isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$BooleanConverter" />
+	<parameter name="nutrientType" displayName="1.4.2.1 Nutrient Type or Nutrient PGM File"
+		type="java.lang.String" defaultValue="Uniform" isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$StringStringConverter"
+		values="Uniform Heterogeneous Gradient sugarspace.pgm ownbelow.pgm " />
+	<parameter name="weibullShape" displayName="4.1.0 Weibull Shape RBH init"
+		type="double" defaultValue="3.5" isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$DoubleConverter" />
+	<parameter name="rbhMin_m" displayName="4.1.0 RBHmin init"
+		type="double" defaultValue="0.003" isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$DoubleConverter" />
+	<parameter name="groundLevel" displayName="1.3 Ground Level [m]"
+		type="double" defaultValue="5.0" isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$DoubleConverter" />
+	<parameter name="minCoppiceRadius_m" displayName="7.1 Min. coppice radius [m]"
+		type="double" defaultValue="0.04" isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$DoubleConverter" />
+	<parameter name="nutrientFunction" displayName="3.5 Nutrient availability Function"
+		type="java.lang.String" defaultValue="c1 + c2 * RNA + c3 * RNA ^ 2"
+		isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$StringStringConverter" />
+	<parameter name="worldHeight" displayName="1.2.3 World Height"
+		type="int" defaultValue="60" isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$IntConverter" />
+	<parameter name="disturbanceIntensity" displayName="1.4.6 Intensity of disturbance events"
+		type="double" defaultValue="0.0" isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$DoubleConverter" />
+	<parameter name="woodDensity_t_per_m3" displayName="7.6 Wood Density [t per m?]"
+		type="double" defaultValue="0.762" isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$DoubleConverter" />
+	<parameter name="scaleFactor"
+		displayName="6.9 Weibull scale factor for wind distribution" type="double"
+		defaultValue="8.15" isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$DoubleConverter" />
+	<parameter name="worldWidth" displayName="1.2.1 World Width"
+		type="int" defaultValue="200" isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$IntConverter" />
+	<parameter name="fonParameters" displayName="5. Field of Neihborhood (FON) Parameters"
+		type="java.lang.String" defaultValue="-" isReadOnly="true"
+		converter="repast.simphony.parameter.StringConverterFactory$StringStringConverter" />
+	<parameter name="updateParams" displayName="1.1.1 Update Parameters"
+		type="boolean" defaultValue="true" isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$BooleanConverter" />
+	<parameter name="dispersal" displayName="6. Dispersal Parameters"
+		type="java.lang.String" defaultValue="-" isReadOnly="true"
+		converter="repast.simphony.parameter.StringConverterFactory$StringStringConverter" />
+	<parameter name="dispersalMode" displayName="6.1 Dispersal mode"
+		type="java.lang.String" defaultValue="No_Disp" isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$StringStringConverter"
+		values="Tree_Pairs No_Disp Rand_Disp Nat_Rand_Disp Avg_Recruit Long_Avg_Recruit Nat_Recruit_Rand_Disp Nat_Recruit_Nat_Disp " />
+	<parameter name="version" displayName="2. Model Version"
+		type="java.lang.String" defaultValue="Shrub_Tree" isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$StringStringConverter"
+		values="Coppicing Above_Below Above_Below_Shift Shrub_Tree Super_Organism Managed" />
+	<parameter name="growthParameters" displayName="4. Growth Parameters"
+		type="java.lang.String" defaultValue="-" isReadOnly="true"
+		converter="repast.simphony.parameter.StringConverterFactory$StringStringConverter" />
+	<parameter name="interSpeciesPlasticityOnly"
+		displayName="5.6 Restrict plasticity to inter-species interactions"
+		type="java.lang.String" defaultValue="None" isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$StringStringConverter"
+		values="None Morph_Plasticity Phys_Plasticity Morph_and_Phys_Plasticity " />
+	<parameter name="heightFunction" displayName="3.2 Height Function"
+		type="java.lang.String" defaultValue="137 + b2 * d"
+		isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$StringStringConverter" />
+	<parameter name="seedWidth" displayName="6.6 Seed width [mm]"
+		type="java.lang.String" defaultValue="11.0 11.0 11.0" isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$StringStringConverter" />
+	<parameter name="maxCoppiceRadius_m" displayName="7.2 Max. coppice radius [m]"
+		type="double" defaultValue="0.12" isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$DoubleConverter" />
+	<parameter name="environmentTypeBelow"
+		displayName="1.4.2 Belowground Environment Type or Environment PGM File"
+		type="java.lang.String" defaultValue="Uniform" isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$StringStringConverter"
+		values="Uniform Heterogeneous Gradient sugarspace.pgm ownbelow.pgm " />
+	<parameter name="fonSpecies1belowground"
+		displayName="5.1.2 FON Species 1 belowground (Imax Imin a b)" type="java.lang.String"
+		defaultValue="0.0289 0.0300 9.86 0.8158" isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$StringStringConverter" />
+	<parameter name="excelPath" displayName="1.6.1 List of Paths of external Excel-Files"
+		type="java.lang.String" defaultValue="Plot1_7y.xls plot2_7y plot3_7y plot4_7y"
+		isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$StringStringConverter" />
+	<parameter name="simTimes" displayName="1.6.2 List of simulation times"
+		type="java.lang.String" defaultValue="7 7 7 7" isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$StringStringConverter" />
+	<parameter name="functions" displayName="3. Functions" type="java.lang.String"
+		defaultValue="-" isReadOnly="true"
+		converter="repast.simphony.parameter.StringConverterFactory$StringStringConverter" />
+	<parameter name="morphologicalPlasticity" displayName="2.3.6 Morphological plasticity of species"
+		type="java.lang.String" defaultValue="false false true" isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$StringStringConverter" />
+	<parameter name="environmentalThresholdTree"
+		displayName="2.3.3 Environmental Threshold for Tree Establishment"
+		type="double" defaultValue="-0.01" isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$DoubleConverter" />
+	<parameter name="coppicing" displayName="7. Coppicing" type="java.lang.String"
+		defaultValue="-" isReadOnly="true"
+		converter="repast.simphony.parameter.StringConverterFactory$StringStringConverter" />
+	<parameter name="crownHeightFunctionShrub" displayName="3.3.2 Crown Height Function Shrub"
+		type="java.lang.String" defaultValue="9.86 * rbh ^ 0.8158" isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$StringStringConverter" />
+	<parameter name="generalSettings" displayName="1. General Settings"
+		type="java.lang.String" defaultValue="-" isReadOnly="true"
+		converter="repast.simphony.parameter.StringConverterFactory$StringStringConverter" />
+	<parameter name="disturbanceFrequency" displayName="1.4.5 Frequency of disturbance events"
+		type="double" defaultValue="0.0" isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$DoubleConverter" />
+	<parameter name="fonSpecies3belowground"
+		displayName="5.3.2 FON Species 3 belowground (Imax Imin a b)" type="java.lang.String"
+		defaultValue="0.05 0.999 11.0 0.654" isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$StringStringConverter" />
+	<parameter name="nutrientMax" displayName="1.4.4.1 Maximum Nutrient Level"
+		type="java.lang.String" defaultValue="369.46 148.68 148.68 148.68"
+		isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$StringStringConverter" />
+	<parameter name="growthFunction" displayName="3.1 Growth Function"
+		type="java.lang.String"
+		defaultValue="c * g * d * ( 1.0 - d * ( 137.0 + b2 * d ) / (dmax * hmax) ) / ( 274.0 + 3.0 * b2 * d )"
+		isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$StringStringConverter" />
+	<parameter name="seedDensity" displayName="6.4 Seeds per crwon surface area [1/m?]"
+		type="java.lang.String" defaultValue="0.006 0.006 0.006" isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$StringStringConverter" />
+	<parameter name="weibullScale" displayName="4.1.0 Weibull Scale RBH init"
+		type="double" defaultValue="0.00405" isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$DoubleConverter" />
+	<parameter name="terminalVelocity" displayName="6.5 Terminal velocity [m/s]"
+		type="java.lang.String" defaultValue="0.0 0.0 0.0" isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$StringStringConverter" />
+	<parameter name="belowgroundReserveFraction" displayName="7.4 Belowground Reserve Fraction"
+		type="double" defaultValue="0.05" isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$DoubleConverter" />
+	<parameter name="crownShift" displayName="2.3.2 Crown Shft"
+		type="boolean" defaultValue="true" isReadOnly="false"
+		converter="repast.simphony.parameter.StringConverterFactory$BooleanConverter" />
+</parameters>
+
+

@@ -1,0 +1,19 @@
+<repast.simphony.data2.engine.FileSinkDescriptor simphonyVersion="2.7.0">
+  <name>Trees Out</name>
+  <dataSet>Tree Traits</dataSet>
+  <delimiter>,</delimiter>
+  <format>TABULAR</format>
+  <sourceIds class="linked-hash-set">
+    <string>PosX</string>
+    <string>PosY</string>
+    <string>dbh_cm</string>
+    <string>Height_cm</string>
+    <string>Age</string>
+    <string>tick</string>
+    <string>Species</string>
+    <string>GeoRefPosX</string>
+    <string>GeoRefPosY</string>
+  </sourceIds>
+  <fileName>MF_Trees_Out.txt</fileName>
+  <addTimeStamp>true</addTimeStamp>
+</repast.simphony.data2.engine.FileSinkDescriptor>
