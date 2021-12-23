@@ -11,6 +11,7 @@ This is a temporary script file.
 # import pywintypes
 # import win32api
 import numpy as np
+import numpy.ma as ma
 import bmi.wrapper
 import ctypes
 import cmocean.cm
@@ -22,6 +23,13 @@ import datetime
 from scipy import integrate
 import faulthandler
 faulthandler.enable()
+import sys
+# print(sys.path)
+sys.path.append('D:/Git/d3d_meso/FnD3D') # as this Func will be in the same folder, no longer needed
+
+from dfm_tools.get_nc import get_netdata, get_ncmodeldata, plot_netmapdata
+# from dfm_tools.get_nc_helpers import get_ncvardimlist, get_timesfromnc, get_hisstationlist
+from d3d_meso_mangro import create_xyzwCellNumber, create_xyzwNodes   
 
 os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
 # see note: https://stackoverflow.com/questions/20554074/sklearn-omp-error-15-initializing-libiomp5md-dll-but-found-mk2iomp5md-dll-a
@@ -80,24 +88,26 @@ model_dimr.initialize()
 
 #Retrieving important model variation from FlowFM
 #source: https://svn.oss.deltares.nl/repos/delft3d/trunk/src/engines_gpl/dflowfm/packages/dflowfm_lib/include/bmi_get_var.inc
-ndx = model_dfm.get_var('ndx') #number of flow nodes (internal boundary)
-ndxi = model_dfm.get_var('ndxi') #number of internal flowcells (2D + 1D)
-xzw = model_dfm.get_var('xzw') #x coordinate of the center of gravity of the boxes
-yzw = model_dfm.get_var('yzw') #y coordinate
-lnx = model_dfm.get_var('lnx') #total number of flow links between the boxes (internal boundary)
-lnxi = model_dfm.get_var('lnxi') #number of links between within domain boxes (internal, 1D+2D)
-ln = model_dfm.get_var('ln') #link matrix between adjacent boxes (node admin) 1D link (2,*) node   administration, 1=nd1,  2=nd2   linker en rechter celnr {"shape": [2, "lnkx"]}
-dx = model_dfm.get_var('dx') #distance between the centers of adjacent boxes (link length)
-wu = model_dfm.get_var('wu') #width of the interface between adjacent boxes (link width)
-ba = model_dfm.get_var('ba') #surface area of the boxes (bottom area) {"location": "face", "shape": ["ndx"]}
-s0 = model_dfm.get_var('s0') #waterlevel    (m ) at start of timestep {"location": "face", "shape": ["ndx"]}
-s1 = model_dfm.get_var('s1') #waterlevel    (m ) at end   of timestep {"location": "face", "shape": ["ndx"]}
-hs = model_dfm.get_var('hs') #water depth at the end of timestep {"location": "face", "shape": ["ndx"]}
-bl = model_dfm.get_var('bl') #bottom level (m) (positive upward) {"location": "face", "shape": ["ndx"]}
-xz = model_dfm.get_var('xz') # waterlevel point / cell centre, x-coordinate (m) {"location": "face", "shape": ["ndx"]}
-yz = model_dfm.get_var('yz') # waterlevel point / cell centre, y-coordinate (m)
-lncn = model_dfm.get_var('lncn')
-LLkkk = model_dfm.get_var('LLkkk')
+# =============================================================================
+# ndx = model_dfm.get_var('ndx') #number of flow nodes (internal boundary)
+# ndxi = model_dfm.get_var('ndxi') #number of internal flowcells (2D + 1D)
+# xzw = model_dfm.get_var('xzw') #x coordinate of the center of gravity of the boxes
+# yzw = model_dfm.get_var('yzw') #y coordinate
+# lnx = model_dfm.get_var('lnx') #total number of flow links between the boxes (internal boundary)
+# lnxi = model_dfm.get_var('lnxi') #number of links between within domain boxes (internal, 1D+2D)
+# ln = model_dfm.get_var('ln') #link matrix between adjacent boxes (node admin) 1D link (2,*) node   administration, 1=nd1,  2=nd2   linker en rechter celnr {"shape": [2, "lnkx"]}
+# dx = model_dfm.get_var('dx') #distance between the centers of adjacent boxes (link length)
+# wu = model_dfm.get_var('wu') #width of the interface between adjacent boxes (link width)
+# ba = model_dfm.get_var('ba') #surface area of the boxes (bottom area) {"location": "face", "shape": ["ndx"]}
+# s0 = model_dfm.get_var('s0') #waterlevel    (m ) at start of timestep {"location": "face", "shape": ["ndx"]}
+# s1 = model_dfm.get_var('s1') #waterlevel    (m ) at end   of timestep {"location": "face", "shape": ["ndx"]}
+# hs = model_dfm.get_var('hs') #water depth at the end of timestep {"location": "face", "shape": ["ndx"]}
+# bl = model_dfm.get_var('bl') #bottom level (m) (positive upward) {"location": "face", "shape": ["ndx"]}
+# xz = model_dfm.get_var('xz') # waterlevel point / cell centre, x-coordinate (m) {"location": "face", "shape": ["ndx"]}
+# yz = model_dfm.get_var('yz') # waterlevel point / cell centre, y-coordinate (m)
+# lncn = model_dfm.get_var('lncn')
+# LLkkk = model_dfm.get_var('LLkkk')
+# =============================================================================
 
 
 model_dfm.get_var_type('bl')
@@ -142,72 +152,84 @@ N = matplotlib.colors.Normalize(data['bl'].min(), data['bl'].max())
 cmap = cmocean.cm.deep_r
 axes[0].scatter(data['xz'], data['yz'], c=cmap(N(data['bl'])), 
                 edgecolor='none')
-# axes[0].scatter(data['xzw'], data['yzw'], c=data['bl'], cmap=cmap, edgecolor='none')
 N = matplotlib.colors.Normalize(data['s1'].min(), data['s1'].max())
 cmap = cmocean.cm.delta
 axes[1].scatter(data['xz'], data['yz'], c=cmap(N(data['s1'])), 
                 edgecolor='none')
-# axes[1].scatter(data['xzw'], data['yzw'], edgecolor='none')
 
 
-face_triangulate = tri.Triangulation(xzw[range(ndx)],yzw[range(ndx)])
-plt.tricontourf(face_triangulate,s1)
 #%%
 
 # Start Run
 model_dimr.update(3600)
 
-realtime = 0
-
-# Extract variables from DFM through BMI
-is_dtint=model_dfm.get_var('is_dtint')
-realtime = realtime+is_dtint
-bedlvl=model_dfm.get_var('bl')
-is_maxvalsnd=model_dfm.get_var('is_maxvalsnd')
-is_sumvalsnd=model_dfm.get_var('is_sumvalsnd')
-
-tau_mn=is_sumvalsnd[range(ndxi),0]/is_dtint
-
-
-print('real time is ' + str(realtime) + ' s, or ')
-
-
+# Finalize the model
 model_dimr.finalize()
 
 #%% coba seleksi mangrove berdasarkan cell
 # =============================================================================
 # 1. point out koordinat cell center (xz,yz)
 # 2. berdasarkan (1) cari titik nodes terdekat (xk,yk)
+# Point 1-2 sudah diaddress dengan Fn create_xyzwCellNumber, create_xyzwNodes
+
+### Example script to create nodes coordinate:
+
+# Point to the data
+dir_testinput = os.path.join(r'D:/Git/d3d_meso/Model-Execute/D3DFM/FunnelMorphMF30')
+file_nc_map = os.path.join(dir_testinput,'dflowfm','Delta_Schematized_funnel_net.nc')
+# Access the information from mesh
+mesh_face_x = get_ncmodeldata(file_nc=file_nc_map, varname='mesh2d_face_x')
+mesh_face_x = ma.compressed(mesh_face_x)
+mesh_face_y = get_ncmodeldata(file_nc=file_nc_map, varname='mesh2d_face_y')
+mesh_face_y = ma.compressed(mesh_face_y)
+mesh_face_nodes = get_ncmodeldata(file_nc=file_nc_map, varname='mesh2d_face_nodes')
+# Access the variables from BMI.get_var
+xk = model_dfm.get_var('xk') #Net node x coordinate {"shape": ["numk"]}
+yk = model_dfm.get_var('yk')
+#xz, yz, related with bl, s1, 
+xz = model_dfm.get_var('xz') #waterlevel point / cell centre, x-coordinate (m) {"location": "face", "shape": ["ndx"]}
+yz = model_dfm.get_var('yz') #y coordinate
+#xzw, yzw related with cell number
+xzw = model_dfm.get_var('xzw') #x coordinate of the center of gravity of the boxes
+yzw = model_dfm.get_var('yzw') #y coordinate
+
+#### calculate the cell number as in the position of xzw and yzw or ndxi
+xyzw_cell_number = create_xyzwCellNumber(xzw,yzw,mesh_face_x,mesh_face_y)
+xyzw_nodes = create_xyzwNodes(mesh_face_nodes,xyzw_cell_number)
+
+#### Nodes coordinate sample script
+# remember the cell number is not in sequence as in the grid,
+# whereas it follows the xzw and yzw order
+# Therefore, the rearranged nodes position based on the BMI-based cell number
+# is given in the xyzw_nodes variable.
+
+# The xz and yz are actually used by the DFM to store the bl, ba, s1, and etc.
+# xz-yz and xzw-yzw are almost identic, except the addition boundary point in
+# the end of the array.
+# For example, if the length of xzw-yzw is 986 rows, and  xz-yz is 1018 rows.
+# So that, in practical, rows 0-985 belong to the internal element and
+# 986-1017 belong to the boundary cell.
+
+# The script below provides the example on how to retrieve the nodes coordinate
+# that is stored in xk and yk.
+
+#### retrieve nodes coordinate in index[0] as indexed in xyzw_nodes
+# If you want to check the cell number index the xyzw_cell_number in column 2.
+position = 256
+data = ma.compressed(xyzw_nodes[position][xyzw_nodes[position].mask == False]).astype(int)# select only the valid data (unmasked / false)
+print(xyzw_cell_number[position,2]+1) # add 1 to adjust the real cell number in netCDF
+# access the nodes number and get the coordinate
+print(xk[data-1], yk[data-1])# substracted to 1 in order to adjust the 0-based position in python
+
+
+## TODO
 # 3. iterasi untuk semua pohon dengan cara:
 #   a. Filter pohon berdasarkan xk,yk
 #   b. hitung species-dependent Htrunk, Dtrunk, Hpneu, Dpneu
 #   c. Hitung drag coefficient representative
 # 4. Lakukan pada masing2 cell yg mana cell sudah diseleksi berdasarkan WoO 
 
-#source: https://stackoverflow.com/questions/10818546/finding-index-of-nearest-point-in-numpy-arrays-of-x-and-y-coordinates
-from scipy import spatial
-ndx = model_dfm.get_var('ndx')
-# A = np.zeros(shape=(ndx,2))
-# A[:,0] = xz
-# A[:,1] = yz
 
-A = np.block([[xk],[yk]]).T #xk,yk is node points
-
-pt = [xz[0], yz[0]]  # <-- the point to find xz,yz is the cell center points
-
-# B = A[spatial.KDTree(A).query(pt)[1]] # <-- the nearest point    
-index = spatial.KDTree(A).query(pt)
-B = A[index[1]]
-
-C = np.zeros((2,2))
-C[0,0] = B[0]
-C[1,0] = B[1]
-
-# jika pt[0] > B[0] maka cari x dan yg lbh besar dari pt[0]
-if pt[0]>B[0] and pt[1]>B[1] :
-    C[0,1]=xz[1]
-    C[1,1]=yz[1]
-    
 # =============================================================================
 #%%
 ## Read the D3D Domain and Map it to create the 'world' for MesoFON

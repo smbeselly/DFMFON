@@ -48,6 +48,7 @@ def create_xyzwCellNumber(xzw,yzw,mesh_face_x,mesh_face_y):
     
     # assign the correct cell number to the matrix (cell number is python based)
     # if the cell number is read as 0, the real cell number in netCDF is 1
+    #source: https://stackoverflow.com/questions/10818546/finding-index-of-nearest-point-in-numpy-arrays-of-x-and-y-coordinates
     for row in range(len(xyzw)): #source: https://www.pluralsight.com/guides/numpy-arrays-iterating
         pt = [xyzw[row,:]]
         index = spatial.KDTree(mesh_face_xy).query(pt)
