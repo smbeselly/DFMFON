@@ -78,7 +78,7 @@ def d3dPolySHP(poly_in, dir_out, out_poly_name, projection):
     }
     # Write a new Shapefile
     # source: https://gis.stackexchange.com/questions/52705/how-to-write-shapely-geometries-to-shapefiles
-    with fiona.open((str(dir_out)+str(out_poly_name)+'.shp'), 'w', \
+    with fiona.open((str(dir_out)+str('/')+str(out_poly_name)+'.shp'), 'w', \
                     'ESRI Shapefile', crs=from_epsg(projection), schema=schema) as c:
         ## If there are multiple geometries, put the "for" loop here
         c.write({
@@ -109,7 +109,7 @@ def d3dCSV2ClippedRaster(concave_path, concave_name, EPSG_coord, matrix, x_res, 
     Clipped Raster
     """
 
-    np.savetxt(str(concave_path)+str(concave_name)+'.csv', matrix, fmt="%f", delimiter=",", header='Lon,Lat,Alt',comments='')
+    np.savetxt(str(concave_path)+str('\\')+str(concave_name)+'.csv', matrix, fmt="%f", delimiter=",", header='Lon,Lat,Alt',comments='')
     
     # Create .vrt file based on the created .csv
     lines = ['<OGRVRTDataSource>', '<OGRVRTLayer name='+'"'+str(concave_name)+'"'+'>',
@@ -119,7 +119,7 @@ def d3dCSV2ClippedRaster(concave_path, concave_name, EPSG_coord, matrix, x_res, 
              '<GeometryField separator=" " encoding="PointFromColumns" x="Lon" y="Lat" z="Alt"/>',
              '</OGRVRTLayer>',
              '</OGRVRTDataSource>']
-    with open(str(concave_path)+str(concave_name)+'.vrt', 'w') as f:
+    with open(str(concave_path)+str('/')+str(concave_name)+'.vrt', 'w') as f:
         f.write('\n'.join(lines))
         
     # Call and run gdal_grid to create raster file from bathymetry
@@ -201,7 +201,7 @@ def d3dRaster2Tiles(out_path, output_filename, ras_clip, tile_size_x, tile_size_
     # Tile the raster domain as the prefered tile size in meter
     for i in range(0, xsize, xsize_tile):
         for j in range(0, ysize, ysize_tile):
-            prep_out = str(out_path) + str(output_filename) + str(i) + "_" + str(j) + ".tif"        
+            prep_out = str(out_path) +str('\\')+ str(output_filename) + str(i) + "_" + str(j) + ".tif"        
             command = 'gdal_translate -of GTIFF -srcwin {i}, {j}, {xsize_tile}, \
                 {ysize_tile} {prep_conv_out} {prep_out}'
             os.system(command.format(i=i, j=j, xsize_tile=xsize_tile, ysize_tile=ysize_tile, 

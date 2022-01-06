@@ -20,6 +20,7 @@ import matplotlib.pyplot as plt
 import matplotlib.tri as tri
 import os
 import datetime
+import pandas as pd
 from scipy import integrate
 import faulthandler
 faulthandler.enable()
@@ -29,7 +30,7 @@ sys.path.append('D:/Git/d3d_meso/FnD3D') # as this Func will be in the same fold
 
 from dfm_tools.get_nc import get_netdata, get_ncmodeldata, plot_netmapdata
 # from dfm_tools.get_nc_helpers import get_ncvardimlist, get_timesfromnc, get_hisstationlist
-from d3d_meso_mangro import create_xyzwCellNumber, create_xyzwNodes   
+from d3d_meso_mangro import create_xyzwCellNumber, create_xyzwNodes, calcDragCoeff    
 
 os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
 # see note: https://stackoverflow.com/questions/20554074/sklearn-omp-error-15-initializing-libiomp5md-dll-but-found-mk2iomp5md-dll-a
@@ -161,7 +162,13 @@ axes[1].scatter(data['xz'], data['yz'], c=cmap(N(data['s1'])),
 #%%
 
 # Start Run
-model_dimr.update(3600)
+# model_dimr.update(3600)
+#testing to run the model for 10 time steps
+for run in range(10):
+    print(model_dfm.get_current_time())
+    model_dimr.update()
+model_dimr.finalize()
+
 
 # Finalize the model
 model_dimr.finalize()
@@ -228,6 +235,54 @@ print(xk[data-1], yk[data-1])# substracted to 1 in order to adjust the 0-based p
 #   b. hitung species-dependent Htrunk, Dtrunk, Hpneu, Dpneu
 #   c. Hitung drag coefficient representative
 # 4. Lakukan pada masing2 cell yg mana cell sudah diseleksi berdasarkan WoO 
+
+# We already have the function to point out the coordinates of the nodes
+# Use that information to do the selection
+
+## The trees location is in text file either as predefined or model results
+# it as txt (csv) file with this following header:
+# 'run','dbh_cm','Height_cm','Age','tick','Species','GeoRefPosX','GeoRefPosY'
+
+# use pandas to access the file
+MFON_HOME = os.path.join(r'D:/Git/d3d_meso/Model-Execute/MesoFON')
+file_loc = os.path.join(MFON_HOME, 'instance_1','MF_Trees_Out.2021.Dec.08.14_26_54.txt')
+
+read_data = pd.read_csv(file_loc)
+
+## How to:
+# 1 baca xyzw_cell_number, tunjukkan cell number di column [2]
+# 2 access xk,yk
+# 3 filter pohon berdasarkan xmin,xmax dan ymin,ymax
+
+row = 5 # dummy position
+position = xyzw_cell_number[row,2].astype(int)
+nodes_data = ma.compressed(xyzw_nodes[position][xyzw_nodes[position].mask == False]).astype(int)# select only the valid data (unmasked / false)
+nodes_pos = np.block([[xk[nodes_data-1]],[yk[nodes_data-1]]]) # substracted to 1 in order to adjust the 0-based position in python
+# Find the min max of each x,y coordinate
+# create the list of x_min-x_max and y_min-y_max
+x_range = [np.min(nodes_pos[0]), np.max(nodes_pos[0])]
+y_range = [np.min(nodes_pos[1]), np.max(nodes_pos[1])]
+
+# subsetting pandas 
+#source: https://cmdlinetips.com/2018/02/how-to-subset-pandas-dataframe-based-on-values-of-a-column/
+# and https://www.geeksforgeeks.org/selecting-rows-in-pandas-dataframe-based-on-conditions/
+read_data_subset = read_data[(read_data['GeoRefPosX'] >= x_range[0]) & 
+                             (read_data['GeoRefPosX'] <= x_range[1])]
+read_data_subset = read_data_subset[(read_data_subset['GeoRefPosY'] >= y_range[0]) & 
+                                    (read_data_subset['GeoRefPosY'] <= y_range[1])]
+
+#TODO pseudo value, should be adjusted with the real simulation value
+cell_area = 400 # adjust
+water_depth = 0.2# adjust
+trees_data = read_data_subset
+
+# cell_area = model_dfm.get_var('ba') # area of the cell (for loop per cell number)
+# water_depth = model_dfm.get_var('hs') # water depth at cell center
+# x_range = x_range # should be as list
+# y_range = y_range # should be as list
+
+# calculate the bulk drag coefficient for the cell, currently only for Avicennia marina
+drag_coeff = calcDragCoeff(x_range, y_range, cell_area, water_depth, trees_data)
 
 
 # =============================================================================
