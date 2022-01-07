@@ -78,7 +78,7 @@ def d3dPolySHP(poly_in, dir_out, out_poly_name, projection):
     }
     # Write a new Shapefile
     # source: https://gis.stackexchange.com/questions/52705/how-to-write-shapely-geometries-to-shapefiles
-    with fiona.open((str(dir_out)+str('/')+str(out_poly_name)+'.shp'), 'w', \
+    with fiona.open((str(dir_out)+str('\\')+str(out_poly_name)+'.shp'), 'w', \
                     'ESRI Shapefile', crs=from_epsg(projection), schema=schema) as c:
         ## If there are multiple geometries, put the "for" loop here
         c.write({
@@ -119,7 +119,7 @@ def d3dCSV2ClippedRaster(concave_path, concave_name, EPSG_coord, matrix, x_res, 
              '<GeometryField separator=" " encoding="PointFromColumns" x="Lon" y="Lat" z="Alt"/>',
              '</OGRVRTLayer>',
              '</OGRVRTDataSource>']
-    with open(str(concave_path)+str('/')+str(concave_name)+'.vrt', 'w') as f:
+    with open(str(concave_path)+str('\\')+str(concave_name)+'.vrt', 'w') as f:
         f.write('\n'.join(lines))
         
     # Call and run gdal_grid to create raster file from bathymetry
