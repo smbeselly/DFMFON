@@ -27,20 +27,26 @@ import glob
 
 import geopandas as gpd
 import pandas as pd
+from scipy.interpolate import interp1d
 from xlrd import open_workbook
 from xlutils.copy import copy
 import shutil
 from pathlib import Path
+from osgeo import gdal, gdalconst
 import zipfile
 import send2trash
+import sys
+import fileinput
 
 ## Set the paths for dll-files and input-files for DFM
 PROJ_HOME = os.path.join(r'D:\Git\d3d_meso')
 D3D_HOME = os.path.join(r'C:\Program Files (x86)\Deltares\Delft3D Flexible Mesh Suite HMWQ (2021.04)\plugins\DeltaShell.Dimr\kernels\x64')
 MFON_HOME = os.path.join(PROJ_HOME,'Model-Execute','MesoFON')
-D3D_workdir = os.path.join(PROJ_HOME,'Model-Execute','D3DFM','FunnelMorphMF30') # model funnel with morpho
+D3D_workdir = os.path.join(PROJ_HOME,'Model-Execute','D3DFM','FunnelMorphMF30_Adjusted') # model funnel with morpho
 MFON_JAR = os.path.join(MFON_HOME, 'complete_model.jar')
+MFON_LocalBatchRunner = os.path.join(MFON_HOME,'local_batch_run.properties')
 gdal_path = os.path.join(r'D:\Program_Files\Anaconda3\envs\d3dfm_39\Lib\site-packages\osgeo_utils')
+JAVAREP = os.path.join(r'C:\Users\sbe002\RepastSimphony-2.8\eclipse\jdk11\bin\java.exe')
 
 MFON_Exchange = os.path.join(PROJ_HOME,'Model-Exchange')
 if not os.path.exists(MFON_Exchange):
@@ -51,6 +57,10 @@ if not os.path.exists(MFON_Env):
 MFON_Trees = os.path.join(MFON_Exchange, 'MesoFON-Trees')
 if not os.path.exists(MFON_Trees):
     os.makedirs(MFON_Trees)
+MFON_OUT = os.path.join(PROJ_HOME,'Model-Out','MesoFON')
+if not os.path.exists(MFON_OUT):
+    os.makedirs(MFON_OUT)
+
 
 dir_out = os.path.join(MFON_Exchange, 'Initialization')
 if not os.path.exists(dir_out):
@@ -58,15 +68,24 @@ if not os.path.exists(dir_out):
 ## settings
 
 EPSG_Project = 32749 # EPSG code for WGS84/ UTM Zone 49S (Porong case study)
-netcdf_domain = os.path.join(D3D_workdir, 'dflowfm', 'Delta_Schematized_funnel_net.nc')
+netcdf_domain = os.path.join(D3D_workdir, 'dflowfm', 'Grid_Funnel_1_net.nc')
 x_res = 10
 y_res = 10
-no_data_val = -999
+no_data_val = -999.0
 tile_size_x = 200 # it is in meter 
 tile_size_y = 200 # which reads info in pixel
 species_name = 'Avicennia_marina'
 LLWL = -1.2
 
+## Check the complete_model.jar file and change this source file
+# for later to be updated with the new params file as generated during the preprocessing
+Sal_Source = r'F:\Temp\MesoFONbatch_JDK11\Data_Trees_JDK11\Raster_Dummy_UTM_'
+Surv_Source = r'F:\Temp\MesoFONbatch_JDK11\Data_Trees_JDK11\Raster_Dummy_UTM_Surv_'
+Excel_Source = r'F:\Temp\MesoFONbatch_JDK11\Data_Trees_JDK11\test_trial.xls'
+
+Sal_Source_Params = r"F:\GIT\Sebrian\macro_FON\meso_FON\Raster_Dummy_UTM_"
+Surv_Source_Params = r"F:\GIT\Sebrian\macro_FON\meso_FON\Raster_Dummy_UTM_Surv_"
+Excel_Source_Params = r"F:\Temp\MesoFONbatch\Data_Trees\test_trial.xls"
 #%% Read the domain and prepare the 'world' for MesoFON
 ##############
 #%% Import the nc file, create hull, and build poly
@@ -105,6 +124,9 @@ np.savetxt(str(dir_out)+ '\\mat_hull'+'.csv', mat_hull, delimiter=",", header='L
 ## It is needed if we use the ConcaveHull method,
 # Otherwise, skip this part and use the manual delineation boundary
 # and name the file as CH_.shp
+# If you are a QGIS user, use Concave hull (k-nearest neighbor)
+# set k=3 as start
+
 projection = EPSG_Project
 dir_out = dir_out
 out_poly_name = 'CH_'
@@ -119,6 +141,7 @@ EPSG_coord = EPSG_Project
 x_res = x_res
 y_res = y_res
 no_data_val = no_data_val
+
 shp_clip = out_poly_name # this assume that the shp file similar with one
                         # build from d3dPolySHP
                         # It will directly refer to the shapefile in the same folder
@@ -177,6 +200,20 @@ for filepath in glob.iglob(file_tile):
 #%% This part is to write xls file
 file_tile_trees = os.path.join(save_tiled_trees,'tile_*_trees.shp')
 
+# define d_137 equation for Avicennia : taken from Uwe Grueter's calculation
+a0 = -0.172
+b0 = 49.0713765855412
+a137 = -0.172
+b137 = 48.10139
+# calculate the h137
+d137 = np.arange(0,125.5,0.5)
+d0 = d137
+h137 = a137*d137**2+b137*d137+137
+h0 = a0*d0**2+b0*d0
+# calculate the correlation with interp1d
+f_rbh = interp1d(h137,d137, fill_value="extrapolate")
+f_0 = interp1d(h0,d0)
+
 for filepath in glob.iglob(file_tile_trees): # looping for all with trees affix
     # print(filepath)
     tile_0_read = gpd.read_file(filepath)
@@ -188,8 +225,14 @@ for filepath in glob.iglob(file_tile_trees): # looping for all with trees affix
     types_species = id_id+1 # this variable starts from 1 to N+1
     shiftedBelowPos = np.ones(len(posX))*1
     age = np.ones(len(posX))*1 # should be derived from shapefile #TO DO will be added later
-    rbh_m = (0.0015*height_m**2)+(0.0015*height_m) #dummy it uses equation in test_trial
-    
+    # rbh_m = (0.0015*height_m**2)+(0.0015*height_m) #dummy it uses equation in test_trial
+    # use the new dbh-height relationship  
+    if height_m.size != 0:
+        height_m = height_m.values  # in metre
+        rbh_m = np.where(height_m < 1.37, f_0(height_m*100)/100, f_rbh(height_m*100)/100)
+    else:
+        rbh_m = tile_0_read['height']
+
     # Create Panda Dataframe with Header
     df = pd.DataFrame({'id': id_id,
                        'speciesName' : speciesName,
@@ -234,43 +277,16 @@ for filepath in glob.iglob(file_tile_trees): # looping for all with trees affix
     wb.save(xls_loc)
 
 #%% Copy and Place, and Prepare the Tiled xls to the designated folder
+# How the scripts work:
+# 1. Delete the existing folders, if exist
+# 2. Create new empty folders with the correct name, extract the jar, and copy the local_batch.properties
+# 3. Delete all content in folder initiate-rasters to make sure that we use the recent ones
+# 4. Create ideal raster for initialization: sal_, surv_ with gdal_calc
+# 5. Replace the content in Unrolled_Param, batch_params.xml, and parameters.xml
 
 file_tile_xls = os.path.join(save_tiled_trees,'tile_*_input.xls')
 
-# baca nama dengan tiles_*_trees.xls
-# read ada berapa banyak tile_*_trees
-# buat folder masing2 tile di baawh Model-Execute
-# Sebelumnya cek apakah ada folder atau tidak, hapus folder lama dan isinya
-# Buat folder baru dengan sesuai nama tiles.
-# Beri nama MEsoFON_tile_0_0.. dst
-# Copy Jar dan extract 
-# Read batch_params.xml dan unrolledParamFile dan rubah konten sesuai dengan 
-# file kita
-# File Raster Salinity di gisSalinityPath
-# File Raster Survival (WoO) di gisSurvivalPath
-
-xlsCounter = len(glob.glob(file_tile_xls))
-
-# import pathlib
-# print(pathlib.Path(filepath).suffix) # only to get the extension
-# recursive delete
-# try:
-#     shutil.rmtree(os.path.join(MFON_Trees,'tile_*'))
-# except OSError as e:
-#     print("Error: %s : %s" % (dir_path, e.strerror))
-
-# # Copy the master jar file into each folder
-# import shutil
-
-# original = r'C:\Users\Ron\Desktop\Test_1\products.csv'
-# target = r'C:\Users\Ron\Desktop\Test_2\products.csv'
-
-# shutil.copyfile(original, target)
-
-### delete old folders, create new tile folders, and extract jar
-# delete (recycle bin) the existing tile_* folder
-# create the empty folders, copy the jar file, and extract
-
+# Delete the existing the execution folder tile_* to prepare for the new one
 for filepate in glob.iglob(os.path.join(MFON_HOME,'tile_*')):
     # shutil.rmtree(filepath) # delete recursive
     # print(filepath)
@@ -280,20 +296,19 @@ for filepate in glob.iglob(os.path.join(MFON_HOME,'tile_*')):
         print("Error: %s : %s" % (filepate, e.strerror))
 
 # Create new folders as the existing xls files and extract MesoFON jar file
-
 for filepath in glob.iglob(file_tile_xls): # looping for all with trees affix
     # print(filepath)
    xls_folder = Path(filepath).stem
    os.makedirs(os.path.join(MFON_HOME,xls_folder))
    with zipfile.ZipFile(MFON_JAR, 'r') as zip_ref:
        zip_ref.extractall(os.path.join(MFON_HOME,xls_folder))
+   shutil.copy(MFON_LocalBatchRunner, os.path.join(MFON_HOME,xls_folder))
+
  
 
 ### Create ideal rasters for initialization files
 # 1. delete all content in folder initiate-rasters
-# 2. create sal and surv rasters, make copies and give 0 and 1 suffix
-# 
-    
+# 2. create sal and surv rasters, make copies and give 0 and 1 suffix 
 save_tiled_env = os.path.join(MFON_Env,'Initiate-Rasters') # location to save the tiled shp
 try:
     send2trash.send2trash(save_tiled_env)
@@ -303,13 +318,23 @@ except OSError as e:
 if not os.path.exists(save_tiled_env):
     os.makedirs(save_tiled_env)
 
-
-# because gdal_calc is python script it is not straightforward
+# Use gdal_calc.py to generate the ideal rasters for intializing the MesoFON
+# because gdal_calc is python script, therefore it is not straightforward
 # source: https://gis.stackexchange.com/questions/268041/inserting-python-variables-into-gdal-calc-expression
 gdal_calc_path = os.path.join(gdal_path, 'gdal_calc.py')
 # set ideal parameter for initialization (the first 3 month)
 calc_surv = '"0*(A>-999)+1"'
 calc_sal = '"0*(A>-999)+35"'
+val_no_data_surv = 0
+val_no_data_sal = 60
+
+def changeNoData(datatif,value):
+    maskfile = gdal.Open(datatif, gdalconst.GA_Update)
+    maskraster = maskfile.ReadAsArray()
+    maskraster = np.where((maskraster > -999), maskraster, value ) # yg lebih dari -999 diganti jadi 0
+    maskband = maskfile.GetRasterBand(1)
+    maskband.WriteArray( maskraster )
+    maskband.FlushCache()
 
 for filepatd in glob.iglob(os.path.join(dir_out,'tile_*.tif')):
     # print(filepatd)
@@ -318,13 +343,16 @@ for filepatd in glob.iglob(os.path.join(dir_out,'tile_*.tif')):
     surv_raster = os.path.join(save_tiled_env, tif_name+'_surv_.tif')
     sal_raster = os.path.join(save_tiled_env, tif_name+'_sal_.tif')
     # define the syntax
-    command_surv = 'python {gdal_calc_path} -A {ori_raster} --outfile={surv_raster} --calc={calc_surv}'
-    command_sal = 'python {gdal_calc_path} -A {ori_raster} --outfile={sal_raster} --calc={calc_sal}'
+    command_surv = 'python {gdal_calc_path} -A {ori_raster} --outfile={surv_raster} --calc={calc_surv} --NoDataValue={no_data_val}'
+    command_sal = 'python {gdal_calc_path} -A {ori_raster} --outfile={sal_raster} --calc={calc_sal} --NoDataValue={no_data_val}'
     # calculate
     os.system(command_surv.format(gdal_calc_path=gdal_calc_path, ori_raster=ori_raster, \
-                                  surv_raster=surv_raster, calc_surv=calc_surv))
+                                  surv_raster=surv_raster, calc_surv=calc_surv, no_data_val=no_data_val))
     os.system(command_sal.format(gdal_calc_path=gdal_calc_path, ori_raster=ori_raster, \
-                                 sal_raster=sal_raster, calc_sal=calc_sal))
+                                 sal_raster=sal_raster, calc_sal=calc_sal, no_data_val=no_data_val))
+    # change the nodata value into 0 for surv and 60 for sal
+    changeNoData(surv_raster,val_no_data_surv)
+    changeNoData(sal_raster,val_no_data_sal)
     # copy and rename the new raster for surv
     raster_surv = surv_raster
     raster_surv_name = Path(raster_surv).stem
@@ -343,15 +371,93 @@ for filepatd in glob.iglob(os.path.join(dir_out,'tile_*.tif')):
     shutil.copyfile(raster_sal, target_ras_sal1)
     
 
-### TODO: Find a way how to replace the content in Unrolled_Param and batch_params.xml
-# TODO: Ganti rumus yg di line 191, pakai rumus d130
+### Replace the content in Unrolled_Param, batch_params.xml, and parameters.xml
+# function to replace the content of the file
+# source = https://www.delftstack.com/howto/python/python-replace-line-in-file/
+def replacement(file, previousw, nextw):
+   for line in fileinput.input(file, inplace=1):
+       line = line.replace(previousw, nextw)
+       sys.stdout.write(line)
+# The Looping to replace the variables in the params files
+for filepatf in glob.iglob(os.path.join(MFON_Exchange,'Initialization','tile_*.tif')):
+    Init_Rasters = save_tiled_env
+    Init_Trees = save_tiled_trees
+    # Create Update Path
+    Sal_Update = os.path.join(Init_Rasters,Path(filepatf).stem+'_sal_').replace("\\",'/')
+    Surv_Update = os.path.join(Init_Rasters,Path(filepatf).stem+'_surv_').replace("\\",'/')
+    Excel_Update = os.path.join(Init_Trees,Path(filepatf).stem+'_trees_input.xls').replace("\\",'/')
+    # Point the Files that need to be updated
+    unrolledParam = os.path.join(MFON_HOME,Path(filepatf).stem+'_trees_input','unrolledParamFile.txt')
+    batchParam = os.path.join(MFON_HOME,Path(filepatf).stem+'_trees_input','scenario.rs','batch_params.xml')
+    param_xml = os.path.join(MFON_HOME,Path(filepatf).stem+'_trees_input','scenario.rs','parameters.xml')
+    # Replace the content of the file
+    # unrolledParamFile.txt
+    replacement(unrolledParam, Surv_Source, Surv_Update)       
+    replacement(unrolledParam, Sal_Source, Sal_Update)
+    replacement(unrolledParam, Excel_Source, Excel_Update)
+    # batch_params.xml
+    replacement(batchParam, Surv_Source, Surv_Update)       
+    replacement(batchParam, Sal_Source, Sal_Update)
+    replacement(batchParam, Excel_Source, Excel_Update)
+    # parameters.xml
+    replacement(param_xml, Surv_Source, Surv_Update)       
+    replacement(param_xml, Sal_Source, Sal_Update)
+    replacement(param_xml, Excel_Source, Excel_Update)
+    
+#%% Use os.system(command) to call Java from Python    
+
+# =============================================================================
+# dir_test = os.path.join(r'D:\Git\d3d_meso\Model-Execute\MesoFON\tile_0_0_trees_input')
+# # delete the existing instance1 in in the folder to prevent symlink errorp prior running
+# try:
+#     send2trash.send2trash(os.path.join(dir_test,'instance_1'))
+# except OSError as e:
+#     print("Error: %s : %s" % (os.path.join(dir_test,'instance_1'), e.strerror))
+# 
+# os.chdir(dir_test)
+# command_java = '{JAVAREP} -cp lib/* repast.simphony.batch.LocalDriver local_batch_run.properties'
+# os.system(command_java.format(JAVAREP=JAVAREP))
+# os.chdir(PROJ_HOME)
+# =============================================================================
+
+for filepatt in glob.iglob(os.path.join(MFON_HOME, 'tile_*')):
+    # delete the existing instance1 in in the folder to prevent symlink errorp prior running
+    try:
+        send2trash.send2trash(os.path.join(filepatt,'instance_1'))
+    except OSError as e:
+        print("Error: %s : %s" % (os.path.join(filepatt,'instance_1'), e.strerror))
+    # cd to the directory where MesoFon Exec is located
+    os.chdir(filepatt)
+    command_java = '{JAVAREP} -cp lib/* repast.simphony.batch.LocalDriver local_batch_run.properties'
+    os.system(command_java.format(JAVAREP=JAVAREP))
+    # back to the project home
+    os.chdir(PROJ_HOME)
 
 
+### retrieving the results and copy to the MesoFON Model-Out
+namae=[] #empty list for initializing the namae
+for filepatg in glob.iglob(os.path.join(MFON_HOME, 'tile_*')):
+    nama = []
+    for name in glob.iglob(os.path.join(filepatg, 'instance_1','MF_Trees_*')):
+        nama.append(name)
+    MFON_OUT_tile = os.path.join(MFON_OUT,Path(filepatg).stem)
+    if not os.path.exists(MFON_OUT_tile):
+        os.makedirs(MFON_OUT_tile)
+    # select the MFON_Trees only and paste it to the MesoFON_Out
+    shutil.copyfile(nama[1], os.path.join(MFON_OUT_tile,Path(nama[1]).name))
+    namae.append(nama[1])
 
+### Compile the results to compile folder
+MFON_OUT_compile = os.path.join(MFON_OUT,'Compile')
+if not os.path.exists(MFON_OUT_compile):
+    os.makedirs(MFON_OUT_compile)
 
+all_df = []    
+for nama_a in namae:
+    df = pd.read_csv(nama_a)
+    all_df.append(df)
 
-
-
-
-
-
+Concat_table = pd.concat(all_df)
+run_is = 'Coupling_0' # change this with the real name
+# Concatenated table is saved as txt file
+Concat_table.to_csv(os.path.join(MFON_OUT_compile,run_is+'.txt'), sep=',', index=False, header=True)
