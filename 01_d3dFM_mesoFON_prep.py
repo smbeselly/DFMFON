@@ -37,13 +37,15 @@ import zipfile
 import send2trash
 import sys
 import fileinput
+import re
 
 ## Set the paths for dll-files and input-files for DFM
 PROJ_HOME = os.path.join(r'D:\Git\d3d_meso')
 D3D_HOME = os.path.join(r'C:\Program Files (x86)\Deltares\Delft3D Flexible Mesh Suite HMWQ (2021.04)\plugins\DeltaShell.Dimr\kernels\x64')
 MFON_HOME = os.path.join(PROJ_HOME,'Model-Execute','MesoFON')
 D3D_workdir = os.path.join(PROJ_HOME,'Model-Execute','D3DFM','FunnelMorphMF30_Adjusted') # model funnel with morpho
-MFON_JAR = os.path.join(MFON_HOME, 'complete_model.jar')
+# MFON_JAR = os.path.join(MFON_HOME, 'complete_model.jar')
+MFON_JAR = os.path.join(MFON_HOME, '20220114-MesoFON_batch','complete_model.jar')
 MFON_LocalBatchRunner = os.path.join(MFON_HOME,'local_batch_run.properties')
 gdal_path = os.path.join(r'D:\Program_Files\Anaconda3\envs\d3dfm_39\Lib\site-packages\osgeo_utils')
 JAVAREP = os.path.join(r'C:\Users\sbe002\RepastSimphony-2.8\eclipse\jdk11\bin\java.exe')
@@ -79,13 +81,17 @@ LLWL = -1.2
 
 ## Check the complete_model.jar file and change this source file
 # for later to be updated with the new params file as generated during the preprocessing
-Sal_Source = r'F:\Temp\MesoFONbatch_JDK11\Data_Trees_JDK11\Raster_Dummy_UTM_'
-Surv_Source = r'F:\Temp\MesoFONbatch_JDK11\Data_Trees_JDK11\Raster_Dummy_UTM_Surv_'
-Excel_Source = r'F:\Temp\MesoFONbatch_JDK11\Data_Trees_JDK11\test_trial.xls'
+# Sal_Source = r'F:\Temp\MesoFONbatch_JDK11\Data_Trees_JDK11\Raster_Dummy_UTM_'
+# Surv_Source = r'F:\Temp\MesoFONbatch_JDK11\Data_Trees_JDK11\Raster_Dummy_UTM_Surv_'
+# Excel_Source = r'F:\Temp\MesoFONbatch_JDK11\Data_Trees_JDK11\test_trial.xls'
+Sal_Source = r'C:\Users\brian\git\macro_FON_220111\meso_FON\tile_20_20_sal_'
+Surv_Source = r'C:\Users\brian\git\macro_FON_220111\meso_FON\tile_20_20_surv_'
+Excel_Source = r'C:\Users\brian\git\macro_FON_220111\meso_FON\tile_20_20_trees_input.xls'
 
 Sal_Source_Params = r"F:\GIT\Sebrian\macro_FON\meso_FON\Raster_Dummy_UTM_"
 Surv_Source_Params = r"F:\GIT\Sebrian\macro_FON\meso_FON\Raster_Dummy_UTM_Surv_"
 Excel_Source_Params = r"F:\Temp\MesoFONbatch\Data_Trees\test_trial.xls"
+
 #%% Read the domain and prepare the 'world' for MesoFON
 ##############
 #%% Import the nc file, create hull, and build poly
@@ -224,7 +230,8 @@ for filepath in glob.iglob(file_tile_trees): # looping for all with trees affix
     speciesName = np.ones(len(posX))*1 #if only one species is recorded, however it is better to place this in shapefile
     types_species = id_id+1 # this variable starts from 1 to N+1
     shiftedBelowPos = np.ones(len(posX))*1
-    age = np.ones(len(posX))*1 # should be derived from shapefile #TO DO will be added later
+    age = tile_0_read['age']
+    # age = np.ones(len(posX))*1 # should be derived from shapefile #TO DO will be added later
     # rbh_m = (0.0015*height_m**2)+(0.0015*height_m) #dummy it uses equation in test_trial
     # use the new dbh-height relationship  
     if height_m.size != 0:
@@ -276,7 +283,7 @@ for filepath in glob.iglob(file_tile_trees): # looping for all with trees affix
     s.write(position_last,0, '/values')
     wb.save(xls_loc)
 
-#%% Copy and Place, and Prepare the Tiled xls to the designated folder
+#%% Copy and Place the payload.jar, and Prepare the Tiled xls to the designated folder
 # How the scripts work:
 # 1. Delete the existing folders, if exist
 # 2. Create new empty folders with the correct name, extract the jar, and copy the local_batch.properties
@@ -428,6 +435,7 @@ for filepatt in glob.iglob(os.path.join(MFON_HOME, 'tile_*')):
         print("Error: %s : %s" % (os.path.join(filepatt,'instance_1'), e.strerror))
     # cd to the directory where MesoFon Exec is located
     os.chdir(filepatt)
+    print('Run MesoFON model', Path(filepatt).stem)
     command_java = '{JAVAREP} -cp lib/* repast.simphony.batch.LocalDriver local_batch_run.properties'
     os.system(command_java.format(JAVAREP=JAVAREP))
     # back to the project home
@@ -438,14 +446,15 @@ for filepatt in glob.iglob(os.path.join(MFON_HOME, 'tile_*')):
 namae=[] #empty list for initializing the namae
 for filepatg in glob.iglob(os.path.join(MFON_HOME, 'tile_*')):
     nama = []
-    for name in glob.iglob(os.path.join(filepatg, 'instance_1','MF_Trees_*')):
+    for name in glob.iglob(os.path.join(filepatg, 'instance_1','MF_Trees_*.txt')):
         nama.append(name)
+    nama = list(filter(lambda x: not re.search('batch_param_map', x), nama)) # exclude batch_param.txt
     MFON_OUT_tile = os.path.join(MFON_OUT,Path(filepatg).stem)
     if not os.path.exists(MFON_OUT_tile):
         os.makedirs(MFON_OUT_tile)
     # select the MFON_Trees only and paste it to the MesoFON_Out
-    shutil.copyfile(nama[1], os.path.join(MFON_OUT_tile,Path(nama[1]).name))
-    namae.append(nama[1])
+    shutil.copyfile(nama[0], os.path.join(MFON_OUT_tile,Path(nama[0]).name))
+    namae.append(nama[0])
 
 ### Compile the results to compile folder
 MFON_OUT_compile = os.path.join(MFON_OUT,'Compile')
@@ -458,6 +467,8 @@ for nama_a in namae:
     all_df.append(df)
 
 Concat_table = pd.concat(all_df)
+# drop tick 0 year, only take 0.25
+Concat_table = Concat_table[Concat_table.tick > 0]
 run_is = 'Coupling_0' # change this with the real name
 # Concatenated table is saved as txt file
 Concat_table.to_csv(os.path.join(MFON_OUT_compile,run_is+'.txt'), sep=',', index=False, header=True)
