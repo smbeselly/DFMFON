@@ -21,22 +21,23 @@ initialization of the MesoFON and DFM model.
 import numpy as np
 import numpy.ma as ma
 import bmi.wrapper
-import ctypes
-import cmocean.cm
-import matplotlib.colors
-import matplotlib.pyplot as plt
-import matplotlib.tri as tri
+# import ctypes
+# import cmocean.cm
+# import matplotlib.colors
+# import matplotlib.pyplot as plt
+# import matplotlib.tri as tri
 import os
-import datetime
+# import datetime
 import pandas as pd
-from scipy import integrate
+# from scipy import integrate
 import faulthandler
 faulthandler.enable()
 import sys
 # print(sys.path)
 sys.path.append('D:/Git/d3d_meso/FnD3D') # as this Func will be in the same folder, no longer needed
 
-from dfm_tools.get_nc import get_netdata, get_ncmodeldata, plot_netmapdata
+# from dfm_tools.get_nc import get_netdata, get_ncmodeldata, plot_netmapdata
+from dfm_tools.get_nc import get_ncmodeldata
 # from dfm_tools.get_nc_helpers import get_ncvardimlist, get_timesfromnc, get_hisstationlist
 from d3d_prep_raster import d3dConcaveHull, d3dPolySHP, d3dCSV2ClippedRaster, d3dRaster2Tiles
 from d3d_meso_mangro import create_xyzwCellNumber, create_xyzwNodes, calcDragCoeff 
@@ -216,6 +217,7 @@ coupling_ntimeUse = np.floor(coupling_ntime)
         
 for ntime in range(int(coupling_ntimeUse)):
     # do the calculation for each coupling_ntime
+    ### 1. run the DFM all the simulation time within ntime
     water_level = np.empty((len(xyzw_cell_number),0)) 
     #https://www.delftstack.com/howto/numpy/python-numpy-empty-array-append/
     for itime in range(int(coupling_time)):
@@ -224,7 +226,7 @@ for ntime in range(int(coupling_ntimeUse)):
         # store the maximum water level per time step in column wise
         water_level = np.append(water_level, np.reshape(s1,(len(xyzw_cell_number),1)), axis=1) #append the s1
     
-    ### convert the water_level from each time_step to each day
+    ### 2. convert the water_level from each time_step to each day
     col_num = (24*3600)/ model_dfm.get_time_step() # equal to how many columns represent 1 day
     # find daily maximum water level
     wl_shape = water_level.shape
@@ -233,7 +235,7 @@ for ntime in range(int(coupling_ntimeUse)):
         bb = np.amax(water_level[:,ii*col_num:ii*col_num+col_num])
         h_wl = np.append(h_wl,bb)
     
-    ### Calculate the probability based on the WoO and store the value in each cell
+    ### 3. Calculate the probability based on the WoO and store the value in each cell
     fromheight = [] # empty list
     Pvalue = [] # empty list
     for ii in range(h_wl.shape[0]):
@@ -241,14 +243,14 @@ for ntime in range(int(coupling_ntimeUse)):
         # Append the value as list
         fromheight = np.append(fromheightcalc) #append as list
         Pvalue = np.append(Pvaluecalc)
-    # calculate the probability of WoO based on median value
+    # 3.1. calculate the probability of WoO based on median value
     med_h_wl = np.median(h_wl, axis=1) # find median value of the h_wl for each cell number
-    # create the survival probability array based on WoO
+    # 3.2. create the survival probability array based on WoO
     surv_val = np.empty(len(med_h_wl)) #initiate an empty array
     for row in range(med_h_wl.shape):
         surv_val[row] = np.interp(med_h_wl[row],fromheight[row],Pvalue[row])
     
-    ### Create the raster from the surv-val
+    ### 4. Create the raster from the surv-val
     surv_val_raster = np.column_stack((xzw,yzw,surv_val))
     concave_path = os.path.join(MFON_Exchange, 'coupling'+str(ntime+1))
     if not os.path.exists(concave_path):
@@ -257,23 +259,23 @@ for ntime in range(int(coupling_ntimeUse)):
     #return to home
     os.chdir(PROJ_HOME)
     
-    ### Tile the raster and filter + delete nodata tiled raster
+    ### 5. Tile the raster and filter + delete nodata tiled raster
     # this is the master of surv tile with tile_0_0 etc...
     output_filename = "tile_"
     ras_clip = os.path.join(concave_path, concave_name+affix+'.tif')
     d3dRaster2Tiles(concave_path, output_filename, ras_clip, tile_size_x, tile_size_y,CreateSHP=True)
     gc.collect() # to clear memory of variables in python after doing del(variables)
     
-    ### Create Mangrove Trees shp and tile
+    ### 6. Create Mangrove Trees shp and tile
     # Master Trees of Each Coupling
     #TODO age_coupling harus diganti biar generik
     # hasil simulasi kok mangrove height-nya besar sekali,, perlu dicek
     # Create master pt shp with info: coord_x, coord_y, height_m, age, rbh_m
     # master tree name: coupling+str(ntime+1)
-    # createPointSHP(read_data, age_coupling0, concave_path, EPSG_Project) 
+    # 6.1. createPointSHP(read_data, age_coupling0, concave_path, EPSG_Project) 
     createPointSHP(read_data, age_coupling, concave_path, EPSG_Project) 
     
-    # Tile the Master Trees
+    # 6.2. Tile the Master Trees
     shp_source = os.path.join(concave_path, 'coupling'+str(ntime+1)) # location of the source tree and the master tree shp
     folder_loc = dir_out # location of the master tiles
     file_tile = os.path.join(dir_out,'tile_*.shp' )
@@ -290,20 +292,20 @@ for ntime in range(int(coupling_ntimeUse)):
         os.system(command_ogr.format(filepath=filepath, save_loc=save_loc, 
                                      shp_source=shp_source))
     
-    ### Create xls file of the tiled trees
+    ### 7. Create xls file of the tiled trees
     # however, it still uses the Avicennia Marina 
     file_tile_trees = os.path.join(save_tiled_trees,'tile_*_trees.shp')
        
-    # define d_137 equation for Avicennia : taken from Uwe Grueter's calculation
+    # 7.1. define d_137 equation for Avicennia : taken from Uwe Grueter's calculation
     a0 = -0.172
     b0 = 49.0713765855412
     a137 = -0.172
     b137 = 48.10139
     
-    # create the XLS files
+    # 7.2. create the XLS files
     createXLSfromSHP(file_tile_trees, a0, b0, a137, b137, save_tiled_trees, species_name)
 
-    ### Create the env raster and tile raster files
+    ### 8. Create the env raster and tile raster files
     # location of the tile is in concave_path\tile_0_0.tif
     # 1. create new folder: coupling+str(ntimes+1)
     # 2. create sal rasters, make copies and give 0 and 1 suffix 
@@ -321,13 +323,14 @@ for ntime in range(int(coupling_ntimeUse)):
     createRaster4MesoFON(concave_path, gdal_calc_path, no_data_val, 
                          save_tiled_env, calc_sal, val_no_data_sal)
     
-    ### Replace the content in Unrolled_Param, batch_params.xml, and parameters.xml
+    ### 9. Replace the content in Unrolled_Param, batch_params.xml, and parameters.xml
     # function to replace the content of the file
     
-    modifyParamMesoFON(MFON_HOME, MFON_Exchange, save_tiled_env, save_tiled_trees, 
-                           Surv_Source, Sal_Source, Excel_Source)
+    Surv_Source, Sal_Source, Excel_Source = modifyParamMesoFON(MFON_HOME, MFON_Exchange, 
+                                                               save_tiled_env, save_tiled_trees, 
+                                                               Surv_Source, Sal_Source, Excel_Source)
     
-    ### Run the MesoFON
+    ### 10. Run the MesoFON
     for filepatt in glob.iglob(os.path.join(MFON_HOME, 'tile_*')):
         # delete the existing instance1 in in the folder to prevent symlink errorp prior running
         try:
@@ -343,7 +346,7 @@ for ntime in range(int(coupling_ntimeUse)):
         os.chdir(PROJ_HOME)
 
 
-    ### retrieving the results and copy to the MesoFON Model-Out
+    ### 11. retrieving the results and copy to the MesoFON Model-Out
     namae=[] #empty list for initializing the namae
     for filepatg in glob.iglob(os.path.join(MFON_HOME, 'tile_*')):
         nama = []
@@ -357,7 +360,7 @@ for ntime in range(int(coupling_ntimeUse)):
         shutil.copyfile(nama[0], os.path.join(MFON_OUT_tile,Path(nama[0]).name))
         namae.append(nama[0])
 
-    ### Compile the results to compile folder
+    ### 12. Compile the results to compile folder
     MFON_OUT_compile = os.path.join(MFON_OUT,'Compile')
     if not os.path.exists(MFON_OUT_compile):
         os.makedirs(MFON_OUT_compile)
@@ -368,25 +371,25 @@ for ntime in range(int(coupling_ntimeUse)):
         all_df.append(df)
 
     Concat_table = pd.concat(all_df)
-    # drop tick 0 year, only take 0.25
+    # 12.1. drop tick 0 year, only take 0.25
     Concat_table = Concat_table[Concat_table.tick > 0]
     run_is = 'coupling'+str(ntime+1) # change this with the real name
-    # Concatenated table is saved as txt file
+    # 12.2. Concatenated table is saved as txt file
     Concat_table.to_csv(os.path.join(MFON_OUT_compile, run_is+'.txt'), sep=',', index=False, header=True)
     
-    ### Read the compile txt file and create the Cd
+    ### 13. Read the compile txt file and create the Cd
     # read_data = pd.read_csv(os.path.join(MFON_OUT_compile, run_is+'.txt'))
     read_data = Concat_table
-    # use spatial in scipy to match the x,y of the mangroves and the age information.
+    # 13.1. use spatial in scipy to match the x,y of the mangroves and the age information.
     master_trees = os.path.join(concave_path+str('\\')+Path(concave_path).stem+'.shp')
     age_coupling = calcAgeCoupling0(read_data, master_trees) # prepare the age_coupling for the Master Trees of Each Coupling procedure
 
-    # For loop for all of the cell number
+    # 14. For loop for all of the cell number
 
     drag_coeff = calcDragInLoop(xyzw_cell_number, model_dfm, xyzw_nodes, xk, yk, read_data)
 
 
-    # update the variable with new value
+    # 15. update the variable with new value
     model_dfm.set_var('Cdvegsp',drag_coeff)
     
 ### End Loop

@@ -629,6 +629,8 @@ def modifyParamMesoFON(MFON_HOME, MFON_Exchange, save_tiled_env, save_tiled_tree
         replacement(param_xml, Surv_Source, Surv_Update)       
         replacement(param_xml, Sal_Source, Sal_Update)
         replacement(param_xml, Excel_Source, Excel_Update)
+    
+    return Surv_Update, Sal_Update, Excel_Update
 
 def calcDragInLoop(xyzw_cell_number, model_dfm, xyzw_nodes, xk, yk, read_data):
     drag_coeff = [] #should explore whether as list or as array list
