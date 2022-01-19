@@ -24,6 +24,14 @@ import shutil
 import fileinput
 import re
 import sys
+sys.path.append('D:/Git/d3d_meso/FnD3D')
+from d3d_prep_raster import d3dPolySHP
+
+import pandas as pd
+from xlrd import open_workbook
+from xlutils.copy import copy
+import rasterio as rio
+from affine import Affine
 
 #%% Function to rearrange the cell number based on the xzw and yzw position
 
@@ -315,8 +323,14 @@ def calcWOO(waterlevel, failure):
         Pselect1 = 0
         Pselect2 = WoOfin[(WoOfin[:,1] >= (startel + (stepsize*i)))]
         Pselect1 = Pselect2[(Pselect2[:,1] <= (startel + (stepsize*(1+i))))]
-        Pvalue[i] = sum(Pselect1[:,0])/len(Pselect1[:,0])
-        PvalueNo[i] = sum(Pselect1[:,0])/len(Pselect1[:,0]) * sum(Pselect1[:,0])
+        if Pselect1.size > 0:
+            Pvalue[i] = sum(Pselect1[:,0])/len(Pselect1[:,0])
+            PvalueNo[i] = sum(Pselect1[:,0])/len(Pselect1[:,0]) * sum(Pselect1[:,0])
+        else:
+            Pvalue[i] = 0
+            PvalueNo[i] = 0
+        # Pvalue[i] = sum(Pselect1[:,0])/len(Pselect1[:,0])
+        # PvalueNo[i] = sum(Pselect1[:,0])/len(Pselect1[:,0]) * sum(Pselect1[:,0])
         fromheight[i] = startel + (stepsize * (i-1))
         toheight[i] = startel + (stepsize * (i))
     
@@ -663,3 +677,301 @@ def calcDragInLoop(xyzw_cell_number, model_dfm, xyzw_nodes, xk, yk, read_data):
         drag_coeff.append(cd_veg)
     
     return drag_coeff
+
+def csv2ClippedRaster(concave_path, surv_val_raster, concave_name, x_res, y_res, no_data_val, affix, dir_out, EPSG_coord):
+    """New csv to raster and clipped raster
+    
+    As the old os.system approach in d3dCSV2ClippedRaster doesn't work
+          
+    Parameters
+    ---------
+    concave_path = path to coupling+str(ntime+1))
+    
+    surv_val_raster = surv_val_raster
+    
+    x_res =  x_res
+    
+    y_res = y_res
+    
+    no_data_val = no_data_val
+      
+    affix = the end of the file name designed as '_clipped'
+    
+    dir_out = path to the CH_.shp in initialization
+    
+    EPSG_coord = EPSG_coord
+
+    Returns
+    ---------
+    updated parameters file (unrolledParamFile, batch_params, and parameters)
+    
+    """
+    os.chdir(concave_path)
+    
+    matrix = surv_val_raster
+    
+    np.savetxt(str(concave_path)+str('\\')+str(concave_name)+'.csv', matrix, fmt="%f", delimiter=",", header='Lon,Lat,Alt',comments='')
+    
+    # Create .vrt file based on the created .csv
+    lines = ['<OGRVRTDataSource>', '<OGRVRTLayer name='+'"'+str(concave_name)+'"'+'>',
+             '<SrcDataSource>'+str(concave_name)+".csv"+'</SrcDataSource>',
+             '<GeometryType>wkbPoint</GeometryType>',
+             '<LayerSRS>EPSG:'+str(EPSG_coord)+'</LayerSRS>',
+             '<GeometryField separator=" " encoding="PointFromColumns" x="Lon" y="Lat" z="Alt"/>',
+             '</OGRVRTLayer>',
+             '</OGRVRTDataSource>']
+    with open(str(concave_path)+str('\\')+str(concave_name)+'.vrt', 'w') as f:
+        f.write('\n'.join(lines))
+    
+    x_min = np.min(surv_val_raster[:,0])
+    x_max = np.max(surv_val_raster[:,0])
+    y_min = np.min(surv_val_raster[:,1])
+    y_max = np.max(surv_val_raster[:,1])
+    x_width = (x_max-x_min)/x_res
+    y_height = (y_max-y_min)/y_res
+
+    lin_raster = gdal.Grid(os.path.join(concave_path,concave_name+'.tif'), 
+                            os.path.join(concave_path,concave_name+'.vrt'),
+                            algorithm = "linear", noData = no_data_val ,zfield = 'Alt',
+                    outputBounds = [x_min,y_max,x_max,y_min],
+                    width = x_width, height = y_height)
+    lin_raster = None
+
+    ras_clip = str(concave_name)+affix+'.tif'
+    cut_call = os.path.join(dir_out,'CH_.shp')
+
+    warpp = gdal.Warp(os.path.join(concave_path,ras_clip), 
+                      os.path.join(concave_path,concave_name+'.tif'), cutlineDSName = cut_call, 
+                      cropToCutline = True, dstNodata=no_data_val)
+
+    warpp = None
+    
+def d3dNewRaster2Tiles(ras_clip, out_path, tile_size_x, tile_size_y, CreateSHP=True):
+    output_filename = "tile_"
+    ds = gdal.Open(ras_clip)
+    gt = ds.GetGeoTransform()
+    band = ds.GetRasterBand(1)
+    # stats = band.GetStatistics(True,True) # results = min, max, mean, StdDev
+    # stats[1]-stats[0] = max-min
+    xsize = band.XSize
+    ysize = band.YSize
+    # get coordinates of upper left corner
+    # xmin = gt[0]
+    # ymax = gt[3]
+    res = gt[1]
+
+    # close dataset
+    ds = None
+    # determine total length of raster
+    # xlen = res * ds.RasterXSize # convert the size in meter to number of pixels
+    # ylen = res * ds.RasterYSize
+
+    # size of a single tile
+    xsize_tile = int(tile_size_x/res) #num of pixels in tile_size_x
+    ysize_tile = int(tile_size_y/res) ##num of pixels in tile_size_y
+
+    # Tile the raster domain as the prefered tile size in meter
+    for i in range(0, xsize, xsize_tile):
+        for j in range(0, ysize, ysize_tile):
+            prep_out = str(out_path) +str('\\')+ str(output_filename) + str(i) + "_" + str(j) + ".tif"        
+            translate_tile = gdal.Translate(prep_out, ras_clip, srcWin = [i,j,xsize_tile,ysize_tile])
+            translate_tile = None
+            # below is to filter and delete the grid with all nodata value
+            dss = gdal.Open(prep_out)
+            bands = dss.GetRasterBand(1)
+            statss = bands.GetStatistics(True,True)
+            if statss[0]!=statss[1]:
+                #build shapefile
+                if CreateSHP == True:
+                    import rasterio as rio
+                    dt = rio.open(prep_out)
+                    crs_raster= dt.crs
+                    left,bottom, right, top = dt.bounds #[left, bottom, right, top]
+                    # Create Shapefile  
+                    from shapely.geometry import box
+                    poly_ras= box(left, bottom, right, top) #create poly box
+                    # plt.plot(*poly_ras.exterior.xy)
+                    out_poly_namet = str(output_filename) + str(i) + "_" + str(j)
+                    d3dPolySHP(poly_ras, out_path, out_poly_namet, str(crs_raster)[5:])
+                    del(dt, crs_raster, left, bottom, right, top, poly_ras)
+                    # import gc 
+                    # gc.collect()
+                # deleting variables
+                del(dss,bands,statss,prep_out)
+                
+            else:    
+                del(dss,bands,statss)
+                prep_del = prep_out
+                del(prep_out)
+                os.remove(str(prep_del))
+                
+def clipSHPcreateXLSfromGPD(file_tile, save_tiled_trees, shp_source, species_name, a0, b0, a137, b137):
+    """Clip the Master Trees and Create XLS from the GPD read
+    
+    Please remind that, the multiplication in rbh is not correctly made
+    
+    Since height from MesoFON is too high.
+          
+    Parameters
+    ---------
+    file_tile = path to the tile for looping
+    
+    save_tiled_trees = path to save the tiled trees and xls
+    
+    shp_source =  master trees
+    
+    species_name = species name
+    
+    a0, b0, a137, b137 = Avicennia Marina Parameters
+
+    Returns
+    ---------
+    XLS files for MesoFON run
+    
+    """
+
+    for filepath in glob.iglob(file_tile):
+        # print(filepath)
+        # save_name = Path(filepath).stem+'_trees'+'.shp'
+        # save_loc = os.path.join(folder_loc,save_name)
+        # save_loc = os.path.join(save_tiled_trees,save_name)
+    # =============================================================================
+    #     command_ogr = 'ogr2ogr -clipsrc {filepath} {save_loc} {shp_source} -f "ESRI Shapefile"'
+    #     os.system(command_ogr.format(filepath=filepath, save_loc=save_loc, 
+    #                                   shp_source=shp_source))
+    # =============================================================================
+        
+       
+        d137 = np.arange(0,125.5,0.5)
+        d0 = d137
+        h137 = a137*d137**2+b137*d137+137
+        h0 = a0*d0**2+b0*d0
+        # calculate the correlation with interp1d
+        f_rbh = interp1d(h137,d137, fill_value="extrapolate")
+        f_0 = interp1d(h0,d0)
+        # calculate the clipping with geopandas
+        # gp_point = shp_source
+        gp_point= gpd.read_file(shp_source)
+        # your_clip = os.path.join(r"D:\Git\d3d_meso\Model-Exchange\Initialization\tile_0_20.shp")
+        gp_clip= gpd.read_file(filepath)
+    
+        tree_point = gp_point.clip(gp_clip)
+        # tree_point.to_file(save_loc)
+        
+        # create the XLS file based on the clipped shp
+        posX = tree_point['coord_x']
+        posY = tree_point['coord_y']
+        height_m = tree_point['height_m'] #change for independent files or standardized the shp
+        id_id = np.arange(len(posX))
+        speciesName = np.ones(len(posX))*1 #if only one species is recorded, however it is better to place this in shapefile
+        types_species = id_id+1 # this variable starts from 1 to N+1
+        # shiftedBelowPos = np.ones(len(posX))*1
+        age = tree_point['age']
+        # age = np.ones(len(posX))*1 # should be derived from shapefile #TO DO will be added later
+        # rbh_m = (0.0015*height_m**2)+(0.0015*height_m) #dummy it uses equation in test_trial
+        # use the new dbh-height relationship  
+        if height_m.size != 0:
+            # height_m = height_m.values  # in metre
+            # rbh_m = np.where(height_m < 1.37, f_0(height_m*100)/100, f_rbh(height_m*100)/100)
+            # sementara diganti height_m*10 saja, karena hasil simulasi MesoFON kok besar sekali tingginya
+            rbh_m = np.where(height_m < 1.37, f_0(height_m*50)/50, f_rbh(height_m*50)/50)
+        else:
+            rbh_m = tree_point['height_m']
+    
+        # Create Panda Dataframe with Header
+        df = pd.DataFrame({'id': id_id,
+                           'speciesName' : speciesName,
+                           'type' : types_species,
+                           'posX' : posX,
+                           'posY' : posY,
+                           'shiftedPosX' : posX,
+                           'shiftedPosY' : posY,
+                           'shiftedBelowPosX' : speciesName,
+                           'shiftedBelowPosY' : speciesName,
+                           'age' : age,
+                           'rbh_m' : rbh_m,
+                           'newRbh_m' : rbh_m,
+                           'height_m' : height_m,
+                           'newHeight_m' : height_m})
+        
+        # Create a Pandas Excel writer using XlsxWriter as the engine.
+        xls_name = Path(filepath).stem+'_trees_input'+'.xls'
+        xls_loc = os.path.join(save_tiled_trees , xls_name)
+        
+        # Convert the dataframe to an XlsxWriter Excel object. Note that we turn off
+        # the default header and skip one row to allow us to insert a user defined
+        # header.
+        startrowis = 4
+        
+        with pd.ExcelWriter(xls_loc) as writer:
+            df.to_excel(writer, sheet_name='Sheet1', index=False, startrow=startrowis, header=True)
+        
+        rb = open_workbook(xls_loc)
+        wb = copy(rb)
+        # Insert the value in worksheet
+        s = wb.get_sheet(0)
+        s.write(0,0,'def')
+        s.write(1,0, 1)
+        s.write(1,1, species_name)
+        s.write(2,0, '/def')
+        s.write(3,0, 'values')
+            # position_last = start the data + 1 (since it contains header) 
+        #  + length of data
+        position_last = startrowis + 1 + len(posX)
+        s.write(position_last,0, '/values')
+        wb.save(xls_loc)
+
+def _new_func_createRaster4MesoFON(concave_path,save_tiled_env, no_data_val, EPSG_Project, val_no_data_sal):
+    dir_coupling = concave_path
+    
+    def changeNoData(datatif,value):
+        maskfile = gdal.Open(datatif, gdalconst.GA_Update)
+        maskraster = maskfile.ReadAsArray()
+        maskraster = np.where((maskraster > -999), maskraster, value ) # yg lebih dari -999 diganti jadi 0
+        maskband = maskfile.GetRasterBand(1)
+        maskband.WriteArray( maskraster )
+        maskband.FlushCache()
+        
+    for filepatd in glob.iglob(os.path.join(dir_coupling,'tile_*.tif')):
+        ori_raster = filepatd
+        tif_name = Path(filepatd).stem
+        surv_raster = os.path.join(dir_coupling, tif_name+'.tif')
+        # surv_raster = filepatd # surv file has been calculated
+        sal_raster = os.path.join(save_tiled_env, tif_name+'_sal_.tif')
+        # calc raster with rasterio and gdal
+         
+        ds = gdal.Open(filepatd, gdal.GA_ReadOnly)
+        GT_input = ds.GetGeoTransform()
+        afn = Affine.from_gdal(*GT_input)
+        band = ds.GetRasterBand(1)
+        raster = band.ReadAsArray()
+        # define the ideal value
+        raster[raster > no_data_val] = 35
+        with rio.open(sal_raster, 'w', driver='GTiff', 
+                           height=raster.shape[0], width=raster.shape[1],
+                           count=1, dtype=np.float64, crs='EPSG:'+str(EPSG_Project),
+                           transform=afn,) as dest_file: #nodata=no_data_val
+            dest_file.write(raster, 1)
+            dest_file.close()
+        
+        
+        # change the nodata value into 0 for surv and 60 for sal
+        # changeNoData(surv_raster,val_no_data_surv) #since the surv raster is calculated from WoO 
+        changeNoData(sal_raster,val_no_data_sal)
+        # copy and rename the new raster for surv
+        raster_surv = surv_raster
+        raster_surv_name = Path(raster_surv).stem+'_surv_'
+        target_ras_surv0 = os.path.join(save_tiled_env,raster_surv_name+'0.tif')
+        target_ras_surv1 = os.path.join(save_tiled_env,raster_surv_name+'1.tif')
+        # do the copy-paste
+        shutil.copyfile(raster_surv, os.path.join(save_tiled_env,raster_surv_name+'.tif'))
+        shutil.copyfile(raster_surv, target_ras_surv0)
+        shutil.copyfile(raster_surv, target_ras_surv1)
+        # copy and rename the new raster for sal
+        raster_sal = sal_raster
+        raster_sal_name = Path(raster_sal).stem
+        target_ras_sal0 = os.path.join(save_tiled_env,raster_sal_name+'0.tif')
+        target_ras_sal1 = os.path.join(save_tiled_env,raster_sal_name+'1.tif')
+        # do the copy-paste
+        shutil.copyfile(raster_sal, target_ras_sal0)
+        shutil.copyfile(raster_sal, target_ras_sal1)
