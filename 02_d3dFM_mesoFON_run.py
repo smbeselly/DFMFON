@@ -105,9 +105,9 @@ affix = '_clipped'
 # Sal_Source = r'F:\Temp\MesoFONbatch_JDK11\Data_Trees_JDK11\Raster_Dummy_UTM_'
 # Surv_Source = r'F:\Temp\MesoFONbatch_JDK11\Data_Trees_JDK11\Raster_Dummy_UTM_Surv_'
 # Excel_Source = r'F:\Temp\MesoFONbatch_JDK11\Data_Trees_JDK11\test_trial.xls'
-Sal_Source = r'D:/Git/d3d_meso/Model-Exchange/MesoFON-Env/Initiate-Rasters/tile_0_0_sal_'
-Surv_Source = r'D:/Git/d3d_meso/Model-Exchange/MesoFON-Env/Initiate-Rasters/tile_0_0_surv_'
-Excel_Source = r'D:/Git/d3d_meso/Model-Exchange/MesoFON-Trees/Initiate-Trees/tile_0_0_trees_input.xls'
+Sal_Source = 'Initiate-Rasters'
+Surv_Source = Sal_Source
+Excel_Source = 'Initiate-Trees'
 
 
 #%% Initiate the BMI
@@ -450,10 +450,12 @@ for ntime in range(int(coupling_ntimeUse)):
     
     ### 9. Replace the content in Unrolled_Param, batch_params.xml, and parameters.xml
     # function to replace the content of the file
-    
+    # for filepatt in glob.iglob(os.path.join(MFON_HOME, 'tile_*')):
+        
     Surv_Source, Sal_Source, Excel_Source = modifyParamMesoFON(MFON_HOME, MFON_Exchange, 
-                                                               save_tiled_env, save_tiled_trees, 
-                                                               Surv_Source, Sal_Source, Excel_Source)
+                                                save_tiled_env, save_tiled_trees, 
+                                                Surv_Source, Sal_Source, 
+                                                Excel_Source, ntime)
     
     ### 10. Run the MesoFON
     for filepatt in glob.iglob(os.path.join(MFON_HOME, 'tile_*')):
@@ -489,10 +491,17 @@ for ntime in range(int(coupling_ntimeUse)):
     MFON_OUT_compile = os.path.join(MFON_OUT,'Compile')
     if not os.path.exists(MFON_OUT_compile):
         os.makedirs(MFON_OUT_compile)
-
+          
     all_df = []    
     for nama_a in namae:
-        df = pd.read_csv(nama_a)
+        try:
+            df = pd.read_csv(nama_a)
+        except pd.errors.EmptyDataError:
+            print( nama_a, " is empty")
+        #     send2trash.send2trash(os.path.join(dir_test,'instance_1'))
+        # except OSError as e:
+        #     print("Error: %s : %s" % (os.path.join(dir_test,'instance_1'), e.strerror))
+        # df = pd.read_csv(nama_a)
         all_df.append(df)
 
     Concat_table = pd.concat(all_df)

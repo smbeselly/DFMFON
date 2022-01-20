@@ -587,7 +587,7 @@ def createRaster4MesoFON(concave_path, gdal_calc_path, no_data_val, save_tiled_e
         shutil.copyfile(raster_sal, target_ras_sal1)
         
 def modifyParamMesoFON(MFON_HOME, MFON_Exchange, save_tiled_env, save_tiled_trees, 
-                       Surv_Source, Sal_Source, Excel_Source):
+                       Surv_Source, Sal_Source, Excel_Source, ntime):
     """Modify unrolledParamFile.txt, batch_params.xml, and parameters.xml
     
     It modifies the path to the surv, sal, and excel file
@@ -607,6 +607,8 @@ def modifyParamMesoFON(MFON_HOME, MFON_Exchange, save_tiled_env, save_tiled_tree
     Sal_Source = str of sal location in payload.jar
     
     Excel_Source = str of excel location in payload.jar
+    
+    ntime = ntime
 
     Returns
     ---------
@@ -620,13 +622,16 @@ def modifyParamMesoFON(MFON_HOME, MFON_Exchange, save_tiled_env, save_tiled_tree
            sys.stdout.write(line)
     # The Looping to replace the variables in the params files
     for filepatf in glob.iglob(os.path.join(MFON_Exchange,'Initialization','tile_*.tif')):
-        Init_Rasters = save_tiled_env
-        Init_Trees = save_tiled_trees
+        # Init_Rasters = save_tiled_env
+        # Init_Trees = save_tiled_trees
         # Create Update Path
-        Sal_Update = os.path.join(Init_Rasters,Path(filepatf).stem+'_sal_').replace("\\",'/')
-        Surv_Update = os.path.join(Init_Rasters,Path(filepatf).stem+'_surv_').replace("\\",'/')
-        Excel_Update = os.path.join(Init_Trees,Path(filepatf).stem+'_trees_input.xls').replace("\\",'/')
-        # Point the Files that need to be updated
+        # Sal_Update = os.path.join(Init_Rasters,Path(filepatf).stem+'_sal_').replace("\\",'/')
+        # Surv_Update = os.path.join(Init_Rasters,Path(filepatf).stem+'_surv_').replace("\\",'/')
+        # Excel_Update = os.path.join(Init_Trees,Path(filepatf).stem+'_trees_input.xls').replace("\\",'/')
+        Sal_Update = 'coupling'+str(ntime+1)
+        Surv_Update = 'coupling'+str(ntime+1)
+        Excel_Update = 'coupling'+str(ntime+1)
+            # Point the Files that need to be updated
         unrolledParam = os.path.join(MFON_HOME,Path(filepatf).stem+'_trees_input','unrolledParamFile.txt')
         batchParam = os.path.join(MFON_HOME,Path(filepatf).stem+'_trees_input','scenario.rs','batch_params.xml')
         param_xml = os.path.join(MFON_HOME,Path(filepatf).stem+'_trees_input','scenario.rs','parameters.xml')
