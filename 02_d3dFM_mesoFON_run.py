@@ -46,12 +46,12 @@ from d3d_meso_mangro import create_xyzwCellNumber, create_xyzwNodes, calcDragCoe
 from d3d_meso_mangro import calcWOO, calcAgeCoupling0, createPointSHP, createXLSfromSHP  
 from d3d_meso_mangro import createRaster4MesoFON, modifyParamMesoFON, calcDragInLoop
 from d3d_meso_mangro import csv2ClippedRaster, d3dNewRaster2Tiles, clipSHPcreateXLSfromGPD
-from d3d_meso_mangro import _new_func_createRaster4MesoFON
+from d3d_meso_mangro import _new_func_createRaster4MesoFON, newCalcDraginLoop
 # import gdal_calc
 
 os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
 
-import gc
+# import gc
 import geopandas as gpd
 from pathlib import Path
 import glob
@@ -94,7 +94,6 @@ y_res = 10
 no_data_val = -999.0
 tile_size_x = 200 # it is in meter 
 tile_size_y = 200 # which reads info in pixel
-species_name = 'Avicennia_marina'
 shp_clip = os.path.join(dir_out, 'CH_shp')
 
 concave_name = 'CH_bathy_'
@@ -169,45 +168,55 @@ master_trees = gpd.read_file(os.path.join(MFON_Trees, 'Master-Trees', 'MangroveA
 MFON_OUT_compile = os.path.join(MFON_OUT,'Compile')
 
 read_data = pd.read_csv(os.path.join(MFON_OUT_compile,'Coupling_0.txt'))
+# TODO the Height is too much,, therefore, I divide this to 10 to make it 'normal
+read_data['Height_cm'] = read_data['Height_cm']/10
+# check the max value
+read_data['Height_cm'].max()
 # use spatial in scipy to match the x,y of the mangroves and the age information.
 # age_coupling0 = calcAgeCoupling0(read_data, master_trees)
 age_coupling = calcAgeCoupling0(read_data, master_trees)
 
 # For loop for all of the cell number
+drag_coeff = newCalcDraginLoop(xyzw_cell_number, xyzw_nodes, xk, yk, read_data, model_dfm)
+# =============================================================================
+# # drag_coeff = [] #should explore whether as list or as array list
+# drag_coeff = np.empty((model_dfm.get_var('Cdvegsp').shape[0],0))
+# # age_read_data = np.append(age_read_data,master_trees['age'][int(index[1])])
+# for row in range(len(xyzw_cell_number)):
+#     ba = model_dfm.get_var('ba') #surface area of the boxes (bottom area) {"location": "face", "shape": ["ndx"]}
+#     hs = model_dfm.get_var('hs') #water depth at the end of timestep {"location": "face", "shape": ["ndx"]}
+#     # find the position based on the cell number
+#     position = xyzw_cell_number[row,2].astype(int)
+#     
+#     nodes_data = ma.compressed(xyzw_nodes[position][xyzw_nodes[position].mask == False]).astype(int)# select only the valid data (unmasked / false)
+#     nodes_pos = np.block([[xk[nodes_data-1]],[yk[nodes_data-1]]]) # substracted to 1 in order to adjust the 0-based position in python
+#     # Find the min max of each x,y coordinate
+#     # create the list of x_min-x_max and y_min-y_max
+#     x_range = [np.min(nodes_pos[0]), np.max(nodes_pos[0])]
+#     y_range = [np.min(nodes_pos[1]), np.max(nodes_pos[1])]
+#     
+#     # subsetting pandas 
+#     read_data_subset = read_data[(read_data['GeoRefPosX'] >= x_range[0]) & 
+#                                  (read_data['GeoRefPosX'] <= x_range[1])]
+#     read_data_subset = read_data_subset[(read_data_subset['GeoRefPosY'] >= y_range[0]) & 
+#                                         (read_data_subset['GeoRefPosY'] <= y_range[1])]
+#     # TODO check cell_area and water_depth
+#     cell_area = ba[row] # check this later 
+#     water_depth = hs[row]# adjust
+#     trees_data = read_data_subset
+#     # calculate the drag coefficient (currently only for Avicennia marina)
+#     cd_veg = calcDragCoeff(x_range, y_range, cell_area, water_depth, trees_data)
+#     # append the calculated cd_veg to the drag_coeff list
+#     # drag_coeff.append(cd_veg)
+#     drag_coeff = np.append(drag_coeff, cd_veg)
+# =============================================================================
+# assume that the boundary flow nodes are located at the end of array
+addition = np.zeros((model_dfm.get_var('ndx')-model_dfm.get_var('ndxi'))) + 0.005  
+drag_coeff = np.append(drag_coeff, addition)  
 
-drag_coeff = [] #should explore whether as list or as array list
-
-for row in range(len(xyzw_cell_number)):
-    ba = model_dfm.get_var('ba') #surface area of the boxes (bottom area) {"location": "face", "shape": ["ndx"]}
-    hs = model_dfm.get_var('hs') #water depth at the end of timestep {"location": "face", "shape": ["ndx"]}
-    # find the position based on the cell number
-    position = xyzw_cell_number[row,2].astype(int)
-    
-    nodes_data = ma.compressed(xyzw_nodes[position][xyzw_nodes[position].mask == False]).astype(int)# select only the valid data (unmasked / false)
-    nodes_pos = np.block([[xk[nodes_data-1]],[yk[nodes_data-1]]]) # substracted to 1 in order to adjust the 0-based position in python
-    # Find the min max of each x,y coordinate
-    # create the list of x_min-x_max and y_min-y_max
-    x_range = [np.min(nodes_pos[0]), np.max(nodes_pos[0])]
-    y_range = [np.min(nodes_pos[1]), np.max(nodes_pos[1])]
-    
-    # subsetting pandas 
-    read_data_subset = read_data[(read_data['GeoRefPosX'] >= x_range[0]) & 
-                                 (read_data['GeoRefPosX'] <= x_range[1])]
-    read_data_subset = read_data_subset[(read_data_subset['GeoRefPosY'] >= y_range[0]) & 
-                                        (read_data_subset['GeoRefPosY'] <= y_range[1])]
-    # TODO check cell_area and water_depth
-    cell_area = ba[row] # check this later 
-    water_depth = hs[row]# adjust
-    trees_data = read_data_subset
-    # calculate the drag coefficient (currently only for Avicennia marina)
-    cd_veg = calcDragCoeff(x_range, y_range, cell_area, water_depth, trees_data)
-    # append the calculated cd_veg to the drag_coeff list
-    drag_coeff.append(cd_veg)
-    
-
-
+# cdvegs = model_dfm.get_var('Cdvegsp')
 # update the variable with new value
-model_dfm.set_var('Cdvegsp',np.array(drag_coeff))
+# model_dfm.set_var('Cdvegsp',drag_coeff)
 
 #%% Loop the Coupling
 
@@ -226,6 +235,8 @@ for ntime in range(int(coupling_ntimeUse)):
     # do the calculation for each coupling_ntime
     print('Start the coupling',str(ntime+1),'computation')
     ### 1. run the DFM all the simulation time within ntime
+    # update the variable with new value taken from previous drag calculation
+    model_dfm.set_var('Cdvegsp',drag_coeff)
     water_level = np.empty((len(xz),0)) 
     #https://www.delftstack.com/howto/numpy/python-numpy-empty-array-append/
     for itime in range(int(coupling_time)):
@@ -234,6 +245,11 @@ for ntime in range(int(coupling_ntimeUse)):
         # store the maximum water level per time step in column wise
         # water_level = np.append(water_level, np.reshape(s1,(len(xyzw_cell_number),1)), axis=1) #append the s1
         water_level = np.append(water_level, np.reshape(s1,(len(s1),1)), axis=1)
+        # calculate the drag coefficient
+        drag_coeff = newCalcDraginLoop(xyzw_cell_number, xyzw_nodes, xk, yk, read_data, model_dfm)
+        drag_coeff = np.append(drag_coeff, addition)  
+        # update the variable with new value
+        model_dfm.set_var('Cdvegsp',drag_coeff)
     
     ### 2. convert the water_level from each time_step to each day
 # =============================================================================
@@ -356,13 +372,12 @@ for ntime in range(int(coupling_ntimeUse)):
     #return to home
     os.chdir(PROJ_HOME)
     
-    ### 5. Tile the raster and filter + delete nodata tiled raster
-    # this is the master of surv tile with tile_0_0 etc...
+    ### 5. Tile the raster based on the tile in initialization folder
     output_filename = "tile_"
     ras_clip = os.path.join(concave_path, concave_name+affix+'.tif')
-    # d3dRaster2Tiles(concave_path, output_filename, ras_clip, tile_size_x, tile_size_y,CreateSHP=True)
+    # d3dRaster2Tiles(concave_path, output_filename, ras_clip, tile_size_x, tile_size_y,CreateSHP=False)
     # gc.collect() # to clear memory of variables in python after doing del(variables)
-    d3dNewRaster2Tiles(ras_clip, concave_path, tile_size_x, tile_size_y, CreateSHP=False)
+    d3dNewRaster2Tiles(ras_clip, concave_path, tile_size_x, tile_size_y, dir_out)
     
     ### 6. Create Mangrove Trees shp and tile
     # Master Trees of Each Coupling
@@ -507,6 +522,8 @@ for ntime in range(int(coupling_ntimeUse)):
     Concat_table = pd.concat(all_df)
     # 12.1. drop tick 0 year, only take 0.25
     Concat_table = Concat_table[Concat_table.tick > 0]
+    # TODO the Height is too much,, therefore, I divide this to 10 to make it 'normal
+    Concat_table['Height_cm'] = Concat_table['Height_cm']/10
     run_is = 'Coupling_'+str(ntime+1) # change this with the real name
     # 12.2. Concatenated table is saved as txt file
     Concat_table.to_csv(os.path.join(MFON_OUT_compile, run_is+'.txt'), sep=',', index=False, header=True)
@@ -518,13 +535,17 @@ for ntime in range(int(coupling_ntimeUse)):
     master_trees = gpd.read_file(os.path.join(concave_path+str('\\')+Path(concave_path).stem+'.shp'))
     age_coupling = calcAgeCoupling0(read_data, master_trees) # prepare the age_coupling for the Master Trees of Each Coupling procedure
 
-    # 14. For loop for all of the cell number
-
-    drag_coeff = calcDragInLoop(xyzw_cell_number, model_dfm, xyzw_nodes, xk, yk, read_data)
-
-
-    # 15. update the variable with new value
-    model_dfm.set_var('Cdvegsp',np.array(drag_coeff))
+# =============================================================================
+### sepertinya ini tetap ada untuk membuat perhitungan di step pertama 
+    # saat running pertama sebelum loop
+#     # 14. For loop for all of the cell number
+# 
+#     drag_coeff = newCalcDraginLoop(xyzw_cell_number, xyzw_nodes, xk, yk, read_data, model_dfm)
+# 
+# 
+#     # 15. update the variable with new value
+#     model_dfm.set_var('Cdvegsp',drag_coeff)
+# =============================================================================
     
 ### End Loop
 #Finalize the running
