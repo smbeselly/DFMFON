@@ -230,10 +230,12 @@ def calcDragCoeff(x_range, y_range, cell_area, water_depth, trees_data):
     L = (V-Vm)/Am
     Cd_no = 0.005 # assume drag coefficient without the presence of vegetation
     e_drag = 5 # set to 5m to obtain realistic value for Cd
-
-    Cd_calc = Cd_no + (e_drag/L)
-    Cd_calc_weighted = cprs_avicennia/ cprs_avicennia.sum() * Cd_calc
-    Cd_calc_weighted = Cd_calc_weighted.sum()
+    if L.size == 0:
+        Cd_calc_weighted = Cd_no
+    else:
+        Cd_calc = Cd_no + (e_drag/L)
+        Cd_calc_weighted = cprs_avicennia/ cprs_avicennia.sum() * Cd_calc
+        Cd_calc_weighted = Cd_calc_weighted.sum()
     
     return Cd_calc_weighted
 
@@ -652,7 +654,8 @@ def modifyParamMesoFON(MFON_HOME, MFON_Exchange, save_tiled_env, save_tiled_tree
     return Surv_Update, Sal_Update, Excel_Update
 
 def calcDragInLoop(xyzw_cell_number, model_dfm, xyzw_nodes, xk, yk, read_data):
-    drag_coeff = [] #should explore whether as list or as array list
+    # drag_coeff = [] #should explore whether as list or as array list
+    drag_coeff = np.empty((model_dfm.get_var('Cdvegsp').shape[0],0))
 
     for row in range(len(xyzw_cell_number)):
         ba = model_dfm.get_var('ba') #surface area of the boxes (bottom area) {"location": "face", "shape": ["ndx"]}
@@ -679,7 +682,8 @@ def calcDragInLoop(xyzw_cell_number, model_dfm, xyzw_nodes, xk, yk, read_data):
         # calculate the drag coefficient (currently only for Avicennia marina)
         cd_veg = calcDragCoeff(x_range, y_range, cell_area, water_depth, trees_data)
         # append the calculated cd_veg to the drag_coeff list
-        drag_coeff.append(cd_veg)
+        # drag_coeff.append(cd_veg)
+        drag_coeff = np.append(drag_coeff, cd_veg)
     
     return drag_coeff
 
@@ -751,7 +755,7 @@ def csv2ClippedRaster(concave_path, surv_val_raster, concave_name, x_res, y_res,
 
     warpp = None
     
-def d3dNewRaster2Tiles(ras_clip, out_path, tile_size_x, tile_size_y, CreateSHP=True):
+def d3dNewRaster2Tiles(ras_clip, out_path, tile_size_x, tile_size_y, dir_out):
     output_filename = "tile_"
     ds = gdal.Open(ras_clip)
     gt = ds.GetGeoTransform()
@@ -778,33 +782,13 @@ def d3dNewRaster2Tiles(ras_clip, out_path, tile_size_x, tile_size_y, CreateSHP=T
     # Tile the raster domain as the prefered tile size in meter
     for i in range(0, xsize, xsize_tile):
         for j in range(0, ysize, ysize_tile):
-            prep_out = str(out_path) +str('\\')+ str(output_filename) + str(i) + "_" + str(j) + ".tif"        
-            translate_tile = gdal.Translate(prep_out, ras_clip, srcWin = [i,j,xsize_tile,ysize_tile])
-            translate_tile = None
-            # below is to filter and delete the grid with all nodata value
-            dss = gdal.Open(prep_out)
-            bands = dss.GetRasterBand(1)
-            statss = bands.GetStatistics(True,True)
-            if statss[0]!=statss[1]:
-                #build shapefile
-                if CreateSHP == True:
-                    import rasterio as rio
-                    dt = rio.open(prep_out)
-                    crs_raster= dt.crs
-                    left,bottom, right, top = dt.bounds #[left, bottom, right, top]
-                    # Create Shapefile  
-                    from shapely.geometry import box
-                    poly_ras= box(left, bottom, right, top) #create poly box
-                    # plt.plot(*poly_ras.exterior.xy)
-                    out_poly_namet = str(output_filename) + str(i) + "_" + str(j)
-                    d3dPolySHP(poly_ras, out_path, out_poly_namet, str(crs_raster)[5:])
-                    del(dt, crs_raster, left, bottom, right, top, poly_ras)
-                    # import gc 
-                    # gc.collect()
-                # deleting variables
-                del(dss,bands,statss,prep_out)
-                
-            else:    
+            print (i,j)
+            prep_out = str(out_path) +str('\\')+ str(output_filename) + str(i) + "_" + str(j) + ".tif"  
+            if os.path.isfile(os.path.join(dir_out,Path(prep_out).name)) == True:
+                translate_tile = gdal.Translate(prep_out, ras_clip, srcWin = [i,j,xsize_tile,ysize_tile])
+                translate_tile = None
+            else:
+                # below is to delete the grid with all nodata value
                 del(dss,bands,statss)
                 prep_del = prep_out
                 del(prep_out)
@@ -852,7 +836,7 @@ def clipSHPcreateXLSfromGPD(file_tile, save_tiled_trees, shp_source, species_nam
         h137 = a137*d137**2+b137*d137+137
         h0 = a0*d0**2+b0*d0
         # calculate the correlation with interp1d
-        f_rbh = interp1d(h137,d137, fill_value="extrapolate")
+        f_dbh = interp1d(h137,d137, fill_value="extrapolate")
         f_0 = interp1d(h0,d0)
         # calculate the clipping with geopandas
         # gp_point = shp_source
@@ -877,9 +861,9 @@ def clipSHPcreateXLSfromGPD(file_tile, save_tiled_trees, shp_source, species_nam
         # use the new dbh-height relationship  
         if height_m.size != 0:
             # height_m = height_m.values  # in metre
-            # rbh_m = np.where(height_m < 1.37, f_0(height_m*100)/100, f_rbh(height_m*100)/100)
-            # sementara diganti height_m*10 saja, karena hasil simulasi MesoFON kok besar sekali tingginya
-            rbh_m = np.where(height_m < 1.37, f_0(height_m*50)/50, f_rbh(height_m*50)/50)
+            rbh_m = np.where(height_m < 1.37, f_0(height_m*100)/100/2, f_dbh(height_m*100)/100/2)
+            # (height_m*100)/100/2 karena mengonversi dari dbh ke rbh
+            # rbh_m = np.where(height_m < 1.37, f_0(height_m*50)/50, f_rbh(height_m*50)/50)
         else:
             rbh_m = tree_point['height_m']
     
@@ -980,3 +964,123 @@ def _new_func_createRaster4MesoFON(concave_path,save_tiled_env, no_data_val, EPS
         # do the copy-paste
         shutil.copyfile(raster_sal, target_ras_sal0)
         shutil.copyfile(raster_sal, target_ras_sal1)
+        
+def newCalcDraginLoop(xyzw_cell_number, xyzw_nodes, xk, yk, read_data, model_dfm):
+    Cd_no = 0.005 # assume drag coefficient without the presence of vegetation
+    # Parameters of the CPRS and Number of Pneumatophore as in Vovides, et al.,2016
+    # a_cprs = 1.45 
+    # b_cprs = 8.97
+    # N Pneumatophore as in van Maanen 
+    d_pneu = 0.01 # m
+    h_pneu = 0.15 # m
+    f_pneu = 0.3 # const in van Maanen
+    D05_pneu = 20 # const in van Maanen
+    ## Create an array of vegetated cell
+    index_veg_cel = np.empty((model_dfm.get_var('Cdvegsp').shape[0],0))
+    for row in range(len(xyzw_cell_number)):
+        position = xyzw_cell_number[row,2].astype(int)
+        
+        nodes_data = ma.compressed(xyzw_nodes[position][xyzw_nodes[position].mask == False]).astype(int)# select only the valid data (unmasked / false)
+        nodes_pos = np.block([[xk[nodes_data-1]],[yk[nodes_data-1]]]) # substracted to 1 in order to adjust the 0-based position in python
+        # Find the min max of each x,y coordinate
+        # create the list of x_min-x_max and y_min-y_max
+        x_range = [np.min(nodes_pos[0]), np.max(nodes_pos[0])]
+        y_range = [np.min(nodes_pos[1]), np.max(nodes_pos[1])]
+        
+        # subsetting pandas 
+        read_data_subset = read_data[(read_data['GeoRefPosX'] >= x_range[0]) & 
+                                     (read_data['GeoRefPosX'] <= x_range[1])]
+        read_data_subset = read_data_subset[(read_data_subset['GeoRefPosY'] >= y_range[0]) & 
+                                            (read_data_subset['GeoRefPosY'] <= y_range[1])]
+        if read_data_subset.shape[0] == 0: #if 0 then skip
+            index_is = 0
+        else:
+            index_is = 1
+        index_veg_cel = np.append(index_veg_cel, index_is)
+    # the boundary flow nodes are located at the end of array
+    
+    ba = model_dfm.get_var('ba') #surface area of the boxes (bottom area) {"location": "face", "shape": ["ndx"]}
+    hs = model_dfm.get_var('hs') #water depth at the end of timestep {"location": "face", "shape": ["ndx"]}
+    
+    drag_coeff = np.empty((model_dfm.get_var('Cdvegsp').shape[0],0))
+    for row in range(len(xyzw_cell_number)):
+        if index_veg_cel[row] == 0:
+            Cd_calc_bare = 0.005
+            drag_coeff = np.append(drag_coeff, Cd_calc_bare)
+        else:
+            # calculate cell_area and water_depth
+            cell_area = ba[row] # sudah sesuai karena boundary ada di array paling akhir
+            water_depth = hs[row]# sama seperti di atas
+            # sometimes there is a condition where the cell is dry
+            # therefore, if it is dry I set the drag as Cd_no
+            if water_depth == 0:
+                Cd_calc_bare = 0.005
+                drag_coeff = np.append(drag_coeff, Cd_calc_bare)
+            else:
+                # print(row)
+               # find the position based on the cell number
+                position = xyzw_cell_number[row,2].astype(int)
+                
+                nodes_data = ma.compressed(xyzw_nodes[position][xyzw_nodes[position].mask == False]).astype(int)# select only the valid data (unmasked / false)
+                nodes_pos = np.block([[xk[nodes_data-1]],[yk[nodes_data-1]]]) # substracted to 1 in order to adjust the 0-based position in python
+                # Find the min max of each x,y coordinate
+                # create the list of x_min-x_max and y_min-y_max
+                x_range = [np.min(nodes_pos[0]), np.max(nodes_pos[0])]
+                y_range = [np.min(nodes_pos[1]), np.max(nodes_pos[1])]
+                
+                # subsetting pandas 
+                read_data_subset = read_data[(read_data['GeoRefPosX'] >= x_range[0]) & 
+                                             (read_data['GeoRefPosX'] <= x_range[1])]
+                read_data_subset = read_data_subset[(read_data_subset['GeoRefPosY'] >= y_range[0]) & 
+                                                    (read_data_subset['GeoRefPosY'] <= y_range[1])]
+                
+    
+                # calculate the drag coefficient (currently only for Avicennia marina)
+                # cd_veg = calcDragCoeff(x_range, y_range, cell_area, water_depth, trees_data)
+            
+                # Calculate the CPRS and Number of Pneumatophore
+                # Define the boundary (CPRS) as in Vovides, et al.,2016          
+                # cprs_avicennia = (a_cprs*read_data_subset['dbh_cm'])/(b_cprs+read_data_subset['dbh_cm']) #results in meter
+            
+                # Volume of the aerial roots
+                N_pneu = 10025*(1/(1+np.exp(f_pneu*(D05_pneu-read_data_subset['dbh_cm']))))
+                          
+                # if function to adjust the h_pneu for Avicennia
+                # this equation is from Du, Qin, et al. 2021
+                if water_depth < h_pneu:
+                    Vm_pneu = np.pi*d_pneu*water_depth/12
+                else:
+                    Vm_pneu = np.pi*d_pneu*h_pneu/12
+            
+                Vm_pneu_total = Vm_pneu*N_pneu #m^3
+                Am_pneu_total = d_pneu*h_pneu*N_pneu #m^2
+            
+                # Calculate the d_0 from height of the tree, wait for Uwe Grueter Confirmation
+                # height is adjusted from the water depth
+                Vm_trunk = np.pi/4*(read_data_subset['dbh_cm']/100)**2*water_depth #m^3 
+                Am_trunk = (read_data_subset['dbh_cm']/100)*water_depth #m^3 
+            
+                # sum of the obstacle volume
+                Vm = Vm_pneu_total + Vm_trunk #m^3
+                # sum of the obstacle area
+                Am = Am_pneu_total + Am_trunk#m^2
+            
+                # Volume of the control water
+            
+                V = cell_area*water_depth
+            
+                # Characteristic Length (m)
+                L = (V-Vm)/Am
+                # Cd_no = 0.005 # assume drag coefficient without the presence of vegetation
+                e_drag = 5 # set to 5m to obtain realistic value for Cd
+            
+                Cd_calc = (Cd_no + (e_drag/L)).sum()
+                # TODO this is just for reminder of the commented script
+                # is it really needed to calculate the weighted drag?
+                # Cd_calc_weighted = Cd_calc*(Vm.sum()/V) + Cd_no * ((V-Vm.sum())/V)
+                
+                # append the calculated cd_veg to the drag_coeff list
+                # drag_coeff.append(cd_veg)
+                drag_coeff = np.append(drag_coeff, Cd_calc)
+        
+    return drag_coeff

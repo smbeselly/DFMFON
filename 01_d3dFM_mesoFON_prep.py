@@ -49,7 +49,7 @@ D3D_HOME = os.path.join(r'C:\Program Files (x86)\Deltares\Delft3D Flexible Mesh 
 MFON_HOME = os.path.join(PROJ_HOME,'Model-Execute','MesoFON')
 D3D_workdir = os.path.join(PROJ_HOME,'Model-Execute','D3DFM','FunnelMorphMF30_Adjusted') # model funnel with morpho
 # MFON_JAR = os.path.join(MFON_HOME, 'complete_model.jar')
-MFON_JAR = os.path.join(MFON_HOME, '20220114-MesoFON_batch','complete_model.jar')
+MFON_JAR = os.path.join(MFON_HOME, 'MesoFON_20220207','complete_model.jar')
 MFON_LocalBatchRunner = os.path.join(MFON_HOME,'local_batch_run.properties')
 gdal_path = os.path.join(r'D:\Program_Files\Anaconda3\envs\d3dfm_39\Lib\site-packages\osgeo_utils')
 JAVAREP = os.path.join(r'C:\Users\sbe002\RepastSimphony-2.8\eclipse\jdk11\bin\java.exe')
@@ -225,7 +225,7 @@ d0 = d137
 h137 = a137*d137**2+b137*d137+137
 h0 = a0*d0**2+b0*d0
 # calculate the correlation with interp1d
-f_rbh = interp1d(h137,d137, fill_value="extrapolate")
+f_dbh = interp1d(h137,d137, fill_value="extrapolate")
 f_0 = interp1d(h0,d0)
 
 for filepath in glob.iglob(file_tile_trees): # looping for all with trees affix
@@ -244,7 +244,7 @@ for filepath in glob.iglob(file_tile_trees): # looping for all with trees affix
     # use the new dbh-height relationship  
     if height_m.size != 0:
         height_m = height_m.values  # in metre
-        rbh_m = np.where(height_m < 1.37, f_0(height_m*100)/100, f_rbh(height_m*100)/100)
+        rbh_m = np.where(height_m < 1.37, f_0(height_m*100)/100/2, f_dbh(height_m*100)/100/2)
     else:
         rbh_m = tile_0_read['height']
 

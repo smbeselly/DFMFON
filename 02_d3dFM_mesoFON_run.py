@@ -67,7 +67,7 @@ PROJ_HOME = os.path.join(r'D:\Git\d3d_meso')
 D3D_HOME = os.path.join(r'C:\Program Files (x86)\Deltares\Delft3D Flexible Mesh Suite HMWQ (2021.04)\plugins\DeltaShell.Dimr\kernels\x64')
 MFON_HOME = os.path.join(PROJ_HOME,'Model-Execute','MesoFON')
 D3D_workdir = os.path.join(PROJ_HOME,'Model-Execute','D3DFM','FunnelMorphMF30_Adjusted') # model funnel with morpho
-MFON_JAR = os.path.join(MFON_HOME, 'complete_model.jar')
+# MFON_JAR = os.path.join(MFON_HOME, 'complete_model.jar')
 MFON_LocalBatchRunner = os.path.join(MFON_HOME,'local_batch_run.properties')
 gdal_path = os.path.join(r'D:\Program_Files\Anaconda3\envs\d3dfm_39\Lib\site-packages\osgeo_utils')
 JAVAREP = os.path.join(r'C:\Users\sbe002\RepastSimphony-2.8\eclipse\jdk11\bin\java.exe')
@@ -168,8 +168,8 @@ master_trees = gpd.read_file(os.path.join(MFON_Trees, 'Master-Trees', 'MangroveA
 MFON_OUT_compile = os.path.join(MFON_OUT,'Compile')
 
 read_data = pd.read_csv(os.path.join(MFON_OUT_compile,'Coupling_0.txt'))
-# TODO the Height is too much,, therefore, I divide this to 10 to make it 'normal
-read_data['Height_cm'] = read_data['Height_cm']/10
+# No more TODO [the Height is too much,, therefore, I divide this to 10 to make it 'normal]
+read_data['Height_cm'] = read_data['Height_cm']
 # check the max value
 read_data['Height_cm'].max()
 # use spatial in scipy to match the x,y of the mangroves and the age information.
@@ -476,7 +476,7 @@ for ntime in range(int(coupling_ntimeUse)):
     for filepatt in glob.iglob(os.path.join(MFON_HOME, 'tile_*')):
         # delete the existing instance1 in in the folder to prevent symlink errorp prior running
         try:
-            send2trash.send2trash(os.path.join(filepatt,'instance_1'))
+            send2trash.send2trash(os.path.relpath(os.path.join(filepatt,'instance_1'),PROJ_HOME))
         except OSError as e:
             print("Error: %s : %s" % (os.path.join(filepatt,'instance_1'), e.strerror))
         # cd to the directory where MesoFon Exec is located
