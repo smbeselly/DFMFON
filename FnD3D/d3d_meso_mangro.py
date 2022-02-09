@@ -368,7 +368,7 @@ def calcAgeCoupling0(read_data, master_trees):
         age_read_data = np.append(age_read_data,master_trees['age'][int(index[1])])
         # age_read_data.append(master_trees['age'][int(index[1])])
 
-    age_coupling0 = read_data['Age']+age_read_data
+    age_coupling0 = read_data['tick']+age_read_data
     
     return age_coupling0
 
@@ -797,9 +797,6 @@ def d3dNewRaster2Tiles(ras_clip, out_path, tile_size_x, tile_size_y, dir_out):
 def clipSHPcreateXLSfromGPD(file_tile, save_tiled_trees, shp_source, species_name, a0, b0, a137, b137):
     """Clip the Master Trees and Create XLS from the GPD read
     
-    Please remind that, the multiplication in rbh is not correctly made
-    
-    Since height from MesoFON is too high.
           
     Parameters
     ---------
@@ -1084,3 +1081,92 @@ def newCalcDraginLoop(xyzw_cell_number, xyzw_nodes, xk, yk, read_data, model_dfm
                 drag_coeff = np.append(drag_coeff, Cd_calc)
         
     return drag_coeff
+
+def New_clipSHPcreateXLSfromGPD(file_tile, save_tiled_trees, shp_source, species_name):
+    """Clip the Master Trees and Create XLS from the GPD read
+    a modified function from clipSHPcreateXLSfromGPD
+    
+    By delete the rbh_m calculation, since the rbh_m has been calculated by
+    MesoFON
+          
+    Parameters
+    ---------
+    file_tile = path to the tile for looping
+    
+    save_tiled_trees = path to save the tiled trees and xls
+    
+    shp_source =  master trees
+    
+    species_name = species name
+    
+    a0, b0, a137, b137 = Avicennia Marina Parameters
+
+    Returns
+    ---------
+    XLS files for MesoFON run
+    
+    """
+
+    for filepath in glob.iglob(file_tile):
+        # calculate the clipping with geopandas
+        # gp_point = shp_source
+        gp_point= gpd.read_file(shp_source)
+        # your_clip = os.path.join(r"D:\Git\d3d_meso\Model-Exchange\Initialization\tile_0_20.shp")
+        gp_clip= gpd.read_file(filepath)
+    
+        tree_point = gp_point.clip(gp_clip)
+        # tree_point.to_file(save_loc)
+        
+        # create the XLS file based on the clipped shp
+        posX = tree_point['coord_x']
+        posY = tree_point['coord_y']
+        height_m = tree_point['height_m'] #change for independent files or standardized the shp
+        rbh_m = tree_point['rbh_m']
+        id_id = np.arange(len(posX))
+        speciesName = np.ones(len(posX))*1 #if only one species is recorded, however it is better to place this in shapefile
+        types_species = id_id+1 # this variable starts from 1 to N+1
+        # shiftedBelowPos = np.ones(len(posX))*1
+        age = tree_point['age']
+            
+        # Create Panda Dataframe with Header
+        df = pd.DataFrame({'id': id_id,
+                           'speciesName' : speciesName,
+                           'type' : types_species,
+                           'posX' : posX,
+                           'posY' : posY,
+                           'shiftedPosX' : posX,
+                           'shiftedPosY' : posY,
+                           'shiftedBelowPosX' : speciesName,
+                           'shiftedBelowPosY' : speciesName,
+                           'age' : age,
+                           'rbh_m' : rbh_m,
+                           'newRbh_m' : rbh_m,
+                           'height_m' : height_m,
+                           'newHeight_m' : height_m})
+        
+        # Create a Pandas Excel writer using XlsxWriter as the engine.
+        xls_name = Path(filepath).stem+'_trees_input'+'.xls'
+        xls_loc = os.path.join(save_tiled_trees , xls_name)
+        
+        # Convert the dataframe to an XlsxWriter Excel object. Note that we turn off
+        # the default header and skip one row to allow us to insert a user defined
+        # header.
+        startrowis = 4
+        
+        with pd.ExcelWriter(xls_loc) as writer:
+            df.to_excel(writer, sheet_name='Sheet1', index=False, startrow=startrowis, header=True)
+        
+        rb = open_workbook(xls_loc)
+        wb = copy(rb)
+        # Insert the value in worksheet
+        s = wb.get_sheet(0)
+        s.write(0,0,'def')
+        s.write(1,0, 1)
+        s.write(1,1, species_name)
+        s.write(2,0, '/def')
+        s.write(3,0, 'values')
+            # position_last = start the data + 1 (since it contains header) 
+        #  + length of data
+        position_last = startrowis + 1 + len(posX)
+        s.write(position_last,0, '/values')
+        wb.save(xls_loc)

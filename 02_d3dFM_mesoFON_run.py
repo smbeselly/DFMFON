@@ -41,12 +41,13 @@ sys.path.append('D:/Git/d3d_meso/FnD3D') # as this Func will be in the same fold
 from dfm_tools.get_nc import get_ncmodeldata
 # from dfm_tools.get_nc_helpers import get_ncvardimlist, get_timesfromnc, get_hisstationlist
 # from d3d_prep_raster import d3dConcaveHull, d3dPolySHP, d3dCSV2ClippedRaster, d3dRaster2Tiles
-from d3d_prep_raster import d3dCSV2ClippedRaster, d3dRaster2Tiles
-from d3d_meso_mangro import create_xyzwCellNumber, create_xyzwNodes, calcDragCoeff 
-from d3d_meso_mangro import calcWOO, calcAgeCoupling0, createPointSHP, createXLSfromSHP  
-from d3d_meso_mangro import createRaster4MesoFON, modifyParamMesoFON, calcDragInLoop
-from d3d_meso_mangro import csv2ClippedRaster, d3dNewRaster2Tiles, clipSHPcreateXLSfromGPD
+# from d3d_prep_raster import d3dCSV2ClippedRaster, d3dRaster2Tiles
+from d3d_meso_mangro import create_xyzwCellNumber, create_xyzwNodes #, calcDragCoeff 
+from d3d_meso_mangro import calcWOO, calcAgeCoupling0, createPointSHP #, createXLSfromSHP  
+from d3d_meso_mangro import modifyParamMesoFON #, createRaster4MesoFON, calcDragInLoop
+from d3d_meso_mangro import csv2ClippedRaster, d3dNewRaster2Tiles #, clipSHPcreateXLSfromGPD
 from d3d_meso_mangro import _new_func_createRaster4MesoFON, newCalcDraginLoop
+from d3d_meso_mangro import New_clipSHPcreateXLSfromGPD
 # import gdal_calc
 
 os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
@@ -168,10 +169,8 @@ master_trees = gpd.read_file(os.path.join(MFON_Trees, 'Master-Trees', 'MangroveA
 MFON_OUT_compile = os.path.join(MFON_OUT,'Compile')
 
 read_data = pd.read_csv(os.path.join(MFON_OUT_compile,'Coupling_0.txt'))
-# No more TODO [the Height is too much,, therefore, I divide this to 10 to make it 'normal]
 read_data['Height_cm'] = read_data['Height_cm']
-# check the max value
-read_data['Height_cm'].max()
+
 # use spatial in scipy to match the x,y of the mangroves and the age information.
 # age_coupling0 = calcAgeCoupling0(read_data, master_trees)
 age_coupling = calcAgeCoupling0(read_data, master_trees)
@@ -400,12 +399,13 @@ for ntime in range(int(coupling_ntimeUse)):
     # I modified the code since, we can directly calculate via geopandas
     # Point 7 is blocked
     
-    a0 = -0.172
-    b0 = 49.0713765855412
-    a137 = -0.172
-    b137 = 48.10139
+    # a0 = -0.172
+    # b0 = 49.0713765855412
+    # a137 = -0.172
+    # b137 = 48.10139
     
-    clipSHPcreateXLSfromGPD(file_tile, save_tiled_trees, shp_source, species_name, a0, b0, a137, b137)
+    # clipSHPcreateXLSfromGPD(file_tile, save_tiled_trees, shp_source, species_name, a0, b0, a137, b137)
+    New_clipSHPcreateXLSfromGPD(file_tile, save_tiled_trees, shp_source, species_name)
         
 # =============================================================================
 #     for filepath in glob.iglob(file_tile):
@@ -522,8 +522,8 @@ for ntime in range(int(coupling_ntimeUse)):
     Concat_table = pd.concat(all_df)
     # 12.1. drop tick 0 year, only take 0.25
     Concat_table = Concat_table[Concat_table.tick > 0]
-    # TODO the Height is too much,, therefore, I divide this to 10 to make it 'normal
-    Concat_table['Height_cm'] = Concat_table['Height_cm']/10
+    # No TODO the Height is too much,, therefore, I divide this to 10 to make it 'normal
+    # Concat_table['Height_cm'] = Concat_table['Height_cm']
     run_is = 'Coupling_'+str(ntime+1) # change this with the real name
     # 12.2. Concatenated table is saved as txt file
     Concat_table.to_csv(os.path.join(MFON_OUT_compile, run_is+'.txt'), sep=',', index=False, header=True)
