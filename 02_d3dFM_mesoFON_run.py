@@ -21,6 +21,7 @@ initialization of the MesoFON and DFM model.
 import numpy as np
 import numpy.ma as ma
 import bmi.wrapper
+import matplotlib.path as mpltPath
 # import ctypes
 # import cmocean.cm
 # import matplotlib.colors
@@ -39,6 +40,7 @@ sys.path.append('D:/Git/d3d_meso/FnD3D') # as this Func will be in the same fold
 
 # from dfm_tools.get_nc import get_netdata, get_ncmodeldata, plot_netmapdata
 from dfm_tools.get_nc import get_ncmodeldata
+from dfm_tools.io.polygon import Polygon
 # from dfm_tools.get_nc_helpers import get_ncvardimlist, get_timesfromnc, get_hisstationlist
 # from d3d_prep_raster import d3dConcaveHull, d3dPolySHP, d3dCSV2ClippedRaster, d3dRaster2Tiles
 # from d3d_prep_raster import d3dCSV2ClippedRaster, d3dRaster2Tiles
@@ -65,7 +67,8 @@ from scipy.interpolate import interp1d
 
 ## Set the paths for dll-files and input-files for DFM
 PROJ_HOME = os.path.join(r'D:\Git\d3d_meso')
-D3D_HOME = os.path.join(r'C:\Program Files (x86)\Deltares\Delft3D Flexible Mesh Suite HMWQ (2021.04)\plugins\DeltaShell.Dimr\kernels\x64')
+# D3D_HOME = os.path.join(r'C:\Program Files (x86)\Deltares\Delft3D Flexible Mesh Suite HMWQ (2021.04)\plugins\DeltaShell.Dimr\kernels\x64')
+D3D_HOME = os.path.join(r'D:\Git\d3d_meso\Model-Execute\D3DFM\oss_artifacts_x64_140691')
 MFON_HOME = os.path.join(PROJ_HOME,'Model-Execute','MesoFON')
 D3D_workdir = os.path.join(PROJ_HOME,'Model-Execute','D3DFM','FunnelMorphMF30_Adjusted') # model funnel with morpho
 # MFON_JAR = os.path.join(MFON_HOME, 'complete_model.jar')
@@ -156,6 +159,8 @@ yz = model_dfm.get_var('yz') #y coordinate
 xzw = model_dfm.get_var('xzw') #x coordinate of the center of gravity of the boxes
 yzw = model_dfm.get_var('yzw') #y coordinate
 # get the cell area
+# # get the ndx index
+# ndx = model_dfm.get_var_shape('ndx')
 
 #### calculate the cell number as in the position of xzw and yzw or ndxi
 xyzw_cell_number = create_xyzwCellNumber(xzw,yzw,mesh_face_x,mesh_face_y)
@@ -163,6 +168,11 @@ xyzw_nodes = create_xyzwNodes(mesh_face_nodes,xyzw_cell_number)
 
 #### Read Master Trees
 master_trees = gpd.read_file(os.path.join(MFON_Trees, 'Master-Trees', 'MangroveAgeMerged.shp'))
+
+#### Read the polygon pli and add the indices
+pli = Polygon.fromfile(os.path.join(D3D_workdir,'dflowfm','vege.pli'))
+path = mpltPath.Path(pli[0][0])
+ind = path.contains_points(np.transpose((xz,yz))).astype(int)
 
 #%% Read the compiled tree from the MesoFON Initialization Run and calculate drag_coefficient
 
@@ -211,7 +221,7 @@ drag_coeff = newCalcDraginLoop(xyzw_cell_number, xyzw_nodes, xk, yk, read_data, 
 # =============================================================================
 # assume that the boundary flow nodes are located at the end of array
 addition = np.zeros((model_dfm.get_var('ndx')-model_dfm.get_var('ndxi'))) + 0.005  
-drag_coeff = np.append(drag_coeff, addition)  
+drag_coeff = np.append(drag_coeff, addition)*ind 
 
 # cdvegs = model_dfm.get_var('Cdvegsp')
 # update the variable with new value
@@ -238,7 +248,21 @@ for ntime in range(int(coupling_ntimeUse)):
     model_dfm.set_var('Cdvegsp',drag_coeff)
     water_level = np.empty((len(xz),0)) 
     #https://www.delftstack.com/howto/numpy/python-numpy-empty-array-append/
-    for itime in range(int(coupling_time)):
+# =============================================================================
+#     for itime in range(int(coupling_time)):
+#         model_dimr.update()
+#         s1 = model_dfm.get_var('s1') 
+#         # store the maximum water level per time step in column wise
+#         # water_level = np.append(water_level, np.reshape(s1,(len(xyzw_cell_number),1)), axis=1) #append the s1
+#         water_level = np.append(water_level, np.reshape(s1,(len(s1),1)), axis=1)
+#         # calculate the drag coefficient
+#         drag_coeff = newCalcDraginLoop(xyzw_cell_number, xyzw_nodes, xk, yk, read_data, model_dfm)
+#         drag_coeff = np.append(drag_coeff, addition)*ind  
+#         # update the variable with new value
+#         model_dfm.set_var('Cdvegsp',drag_coeff)
+# =============================================================================
+    t=0 # since the time step in DFM is flexible, therefore use this approach.
+    while t<coupling_period_model:
         model_dimr.update()
         s1 = model_dfm.get_var('s1') 
         # store the maximum water level per time step in column wise
@@ -246,9 +270,12 @@ for ntime in range(int(coupling_ntimeUse)):
         water_level = np.append(water_level, np.reshape(s1,(len(s1),1)), axis=1)
         # calculate the drag coefficient
         drag_coeff = newCalcDraginLoop(xyzw_cell_number, xyzw_nodes, xk, yk, read_data, model_dfm)
-        drag_coeff = np.append(drag_coeff, addition)  
+        drag_coeff = np.append(drag_coeff, addition)*ind  
         # update the variable with new value
         model_dfm.set_var('Cdvegsp',drag_coeff)
+        dts = model_dfm.get_time_step()
+        t=t+dts
+        print('Coupling ',ntime, 'run ', t, '/', coupling_period_model)
     
     ### 2. convert the water_level from each time_step to each day
 # =============================================================================
