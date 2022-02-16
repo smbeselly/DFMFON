@@ -23,6 +23,7 @@ from osgeo import gdal, gdalconst
 import shutil
 import fileinput
 import re
+import itertools
 import sys
 sys.path.append('D:/Git/d3d_meso/FnD3D')
 from d3d_prep_raster import d3dPolySHP
@@ -794,6 +795,45 @@ def d3dNewRaster2Tiles(ras_clip, out_path, tile_size_x, tile_size_y, dir_out):
                 del(prep_out)
                 os.remove(str(prep_del))
                 
+def Sald3dNewRaster2Tiles(ras_clip, out_path, tile_size_x, tile_size_y, dir_out, output_filename):
+    ds = gdal.Open(ras_clip)
+    gt = ds.GetGeoTransform()
+    band = ds.GetRasterBand(1)
+    # stats = band.GetStatistics(True,True) # results = min, max, mean, StdDev
+    # stats[1]-stats[0] = max-min
+    xsize = band.XSize
+    ysize = band.YSize
+    # get coordinates of upper left corner
+    # xmin = gt[0]
+    # ymax = gt[3]
+    res = gt[1]
+
+    # close dataset
+    ds = None
+    # determine total length of raster
+    # xlen = res * ds.RasterXSize # convert the size in meter to number of pixels
+    # ylen = res * ds.RasterYSize
+
+    # size of a single tile
+    xsize_tile = int(tile_size_x/res) #num of pixels in tile_size_x
+    ysize_tile = int(tile_size_y/res) ##num of pixels in tile_size_y
+
+    # Tile the raster domain as the prefered tile size in meter
+    for i in range(0, xsize, xsize_tile):
+        for j in range(0, ysize, ysize_tile):
+            print (i,j)
+            prep_out = str(out_path) +str('\\')+ str(output_filename) + str(i) + "_" + str(j) + ".tif" 
+            check_dir = str(out_path) +str('\\')+ 'tile_' + str(i) + "_" + str(j) + ".tif" 
+            if os.path.isfile(os.path.join(dir_out,Path(check_dir).name)) == True:
+                translate_tile = gdal.Translate(prep_out, ras_clip, srcWin = [i,j,xsize_tile,ysize_tile])
+                translate_tile = None
+            else:
+                # below is to delete the grid with all nodata value
+                del(dss,bands,statss)
+                prep_del = prep_out
+                del(prep_out)
+                os.remove(str(prep_del))
+                
 def clipSHPcreateXLSfromGPD(file_tile, save_tiled_trees, shp_source, species_name, a0, b0, a137, b137):
     """Clip the Master Trees and Create XLS from the GPD read
     
@@ -1170,3 +1210,47 @@ def New_clipSHPcreateXLSfromGPD(file_tile, save_tiled_trees, shp_source, species
         position_last = startrowis + 1 + len(posX)
         s.write(position_last,0, '/values')
         wb.save(xls_loc)
+
+def SalNew_func_createRaster4MesoFON(concave_path,save_tiled_env, filename, dir_out, end_name):
+    dir_coupling = concave_path
+    
+    aa = glob.iglob(os.path.join(dir_coupling, filename+'.tif'))
+    bb = glob.iglob(os.path.join(dir_out, 'tile_*.tif'))
+        
+    for (filepatd, filepatc) in itertools.zip_longest(aa,bb):
+        # copy and rename the new raster for surv
+        raster_surv = filepatd
+        raster_surv_name = Path(filepatc).stem+end_name
+        target_ras_surv0 = os.path.join(save_tiled_env,raster_surv_name+'0.tif')
+        target_ras_surv1 = os.path.join(save_tiled_env,raster_surv_name+'1.tif')
+        # do the copy-paste
+        shutil.copyfile(raster_surv, os.path.join(save_tiled_env,raster_surv_name+'.tif'))
+        shutil.copyfile(raster_surv, target_ras_surv0)
+        shutil.copyfile(raster_surv, target_ras_surv1)
+
+def SalNew_Sal_func_createRaster4MesoFON(concave_path,save_tiled_env, filename, dir_out, end_name, val_no_data_sal):
+    dir_coupling = concave_path
+    
+    def changeNoData(datatif,value):
+        maskfile = gdal.Open(datatif, gdalconst.GA_Update)
+        maskraster = maskfile.ReadAsArray()
+        maskraster = np.where((maskraster > -999), maskraster, value ) # yg lebih dari -999 diganti jadi 0
+        maskband = maskfile.GetRasterBand(1)
+        maskband.WriteArray( maskraster )
+        maskband.FlushCache()
+        
+    aa = glob.iglob(os.path.join(dir_coupling, filename+'.tif'))
+    bb = glob.iglob(os.path.join(dir_out, 'tile_*.tif'))
+        
+    for (filepatd, filepatc) in itertools.zip_longest(aa,bb):
+        # copy and rename the new raster for surv
+        raster_surv = filepatd
+        changeNoData(raster_surv,val_no_data_sal)
+        raster_surv_name = Path(filepatc).stem+end_name
+        target_ras_surv0 = os.path.join(save_tiled_env,raster_surv_name+'0.tif')
+        target_ras_surv1 = os.path.join(save_tiled_env,raster_surv_name+'1.tif')
+        # do the copy-paste
+        shutil.copyfile(raster_surv, os.path.join(save_tiled_env,raster_surv_name+'.tif'))
+        shutil.copyfile(raster_surv, target_ras_surv0)
+        shutil.copyfile(raster_surv, target_ras_surv1)
+ 

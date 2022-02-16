@@ -4,8 +4,7 @@ Created on Mon Jan 10 13:50:58 2022
 
 @author: sbe002
 
-This the scipt to do the running after the preparation and
-initialization of the MesoFON and DFM model.
+This is the script for model include salinity
 """
 
 #%% Reset all variable
@@ -29,9 +28,9 @@ from dfm_tools.io.polygon import Polygon
 from d3d_meso_mangro import create_xyzwCellNumber, create_xyzwNodes #, calcDragCoeff 
 from d3d_meso_mangro import calcWOO, calcAgeCoupling0, createPointSHP #, createXLSfromSHP  
 from d3d_meso_mangro import modifyParamMesoFON #, createRaster4MesoFON, calcDragInLoop
-from d3d_meso_mangro import csv2ClippedRaster, d3dNewRaster2Tiles #, clipSHPcreateXLSfromGPD
-from d3d_meso_mangro import _new_func_createRaster4MesoFON, newCalcDraginLoop
-from d3d_meso_mangro import New_clipSHPcreateXLSfromGPD
+from d3d_meso_mangro import csv2ClippedRaster, Sald3dNewRaster2Tiles #, clipSHPcreateXLSfromGPD
+from d3d_meso_mangro import SalNew_func_createRaster4MesoFON, newCalcDraginLoop
+from d3d_meso_mangro import New_clipSHPcreateXLSfromGPD, SalNew_Sal_func_createRaster4MesoFON
 
 os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE" #to prevent error in matplotlib
 
@@ -47,7 +46,7 @@ from scipy.interpolate import interp1d
 PROJ_HOME = os.path.join(r'D:\Git\d3d_meso')
 D3D_HOME = os.path.join(r'D:\Git\d3d_meso\Model-Execute\D3DFM\oss_artifacts_x64_140691')
 MFON_HOME = os.path.join(PROJ_HOME,'Model-Execute','MesoFON')
-D3D_workdir = os.path.join(PROJ_HOME,'Model-Execute','D3DFM','FunnelMorphMF30_Adjusted') # model funnel with morpho
+D3D_workdir = os.path.join(PROJ_HOME,'Model-Execute','D3DFM','FunnelMorphMF30_Adjusted_Saline') # model funnel with morpho
 # MFON_JAR = os.path.join(MFON_HOME, 'complete_model.jar')
 MFON_LocalBatchRunner = os.path.join(MFON_HOME,'local_batch_run.properties')
 gdal_path = os.path.join(r'D:\Program_Files\Anaconda3\envs\d3dfm_39\Lib\site-packages\osgeo_utils')
@@ -162,17 +161,20 @@ addition = np.zeros((model_dfm.get_var('ndx')-model_dfm.get_var('ndxi'))) + 0.00
 drag_coeff = np.append(drag_coeff, addition)*ind 
 
 #%% Loop the Coupling
-
-coupling_period = coupling_period*24*3600 # change from days to second
-coupling_period_model = coupling_period/MorFac # time required in model to achieve same coupling period (in seconds)
-# how many loops required by Delft3D to finish one coupling period
-coupling_time = coupling_period_model/model_dfm.get_time_step() # how many iterations is needed to achieve the coupling period model
-# how many coupling is required
-coupling_ntime = model_dfm.get_end_time()/coupling_period_model # how many coupling is needed with MesoFON
+# change from days to second
+coupling_period = coupling_period*24*3600 
+# time required in model to achieve same coupling period (in seconds)
+coupling_period_model = coupling_period/MorFac 
+# how many loops required by Delft3D to finish one coupling period or
+# how many iterations is needed to achieve the coupling period model
+coupling_time = coupling_period_model/model_dfm.get_time_step() 
+# how many coupling is required or needed with MesoFON
+coupling_ntime = model_dfm.get_end_time()/coupling_period_model # how many coupling is 
 # to accommodate not integer coupling ntime, take the floor value
 # and in the end of looping continue the rest of the simulation if the value is
 # not integer
-coupling_ntimeUse = np.floor(coupling_ntime) # if the number is not round use the floor value
+# if the number is not round use the floor value
+coupling_ntimeUse = np.floor(coupling_ntime) 
         
 for ntime in range(int(coupling_ntimeUse)):
     # do the calculation for each coupling_ntime
@@ -181,14 +183,17 @@ for ntime in range(int(coupling_ntimeUse)):
     # update the variable with new value taken from previous drag calculation
     model_dfm.set_var('Cdvegsp',drag_coeff)
     water_level = np.empty((len(xz),0)) 
+    salinity = np.empty((len(xz),0)) 
     #https://www.delftstack.com/howto/numpy/python-numpy-empty-array-append/
 
     t=0 # since the time step in DFM is flexible, therefore use this approach.
     while t<coupling_period_model:
         model_dimr.update()
         s1 = model_dfm.get_var('s1') # water level
+        sa1 = model_dfm.get_var('sa1') # salinity
         # store the maximum water level per time step in column wise
         water_level = np.append(water_level, np.reshape(s1,(len(s1),1)), axis=1)
+        salinity = np.append(salinity, np.reshape(sa1,(len(sa1),1)), axis=1)
         # calculate the drag coefficient
         drag_coeff = newCalcDraginLoop(xyzw_cell_number, xyzw_nodes, xk, yk, read_data, model_dfm)
         drag_coeff = np.append(drag_coeff, addition)*ind  
@@ -227,7 +232,7 @@ for ntime in range(int(coupling_ntimeUse)):
     col_num = int(24/value_floor) # equal to how many columns represent 1 day
     col_lookup = int(value_interp/col_num)
     # find daily maximum water level
-    wl_shape = water_level.shape
+    # wl_shape = water_level.shape
     h_wl = np.empty((0, col_lookup))
     # real time in hour is coupling_period/3600
     bb = np.empty((0, col_lookup))
@@ -245,28 +250,47 @@ for ntime in range(int(coupling_ntimeUse)):
         h_wl = np.append(h_wl,bb,axis=0)
     
     ### 3. Calculate the probability based on the WoO and store the value in each cell
-    med_h_wl = np.median(h_wl, axis=1) # find median value of the h_wl for each cell number
+    # find median value of the h_wl for each cell number
+    med_h_wl = np.median(h_wl, axis=1) 
+    # find median value of salinity for each cell number
+    med_sal = np.median(salinity, axis=1)
     
+    # calculate WoO probability value from h_wl (daily max water level)
     surv_val = np.empty(len(med_h_wl)) #initiate an empty array
     for ii in range(h_wl.shape[0]):
         fromheightcalc, Pvaluecalc = calcWOO(h_wl[ii,:],woo_inun) # get correlation of elevation and Probability
         surv_val[ii] = np.interp(med_h_wl[ii],fromheightcalc,Pvaluecalc)
         
    
-    ### 4. Create the raster from the surv-val
+    ### 4. Convert from data point to raster environment 
+    # 4.1 Create raster from the surv-val
     surv_val_raster = np.column_stack((xz,yz,surv_val))
     concave_path = os.path.join(MFON_Exchange, 'coupling'+str(ntime+1))
     if not os.path.exists(concave_path):
         os.makedirs(concave_path)
-
-    csv2ClippedRaster(concave_path, surv_val_raster, concave_name, x_res, y_res, no_data_val, affix, dir_out, EPSG_Project)
+    surv_val_name = 'CH_surv_val'
+    csv2ClippedRaster(concave_path, surv_val_raster, surv_val_name, x_res, y_res, no_data_val, affix, dir_out, EPSG_Project)
     #return to home
     os.chdir(PROJ_HOME)
     
+    #4.2 Create raster from med_sal
+    sal_raster = np.column_stack((xz,yz,med_sal))
+    sal_val_name = 'CH_sal_val'
+    csv2ClippedRaster(concave_path, sal_raster, sal_val_name, x_res, y_res, no_data_val, affix, dir_out, EPSG_Project)
+    #return to home
+    os.chdir(PROJ_HOME)
+    
+    
     ### 5. Tile the raster based on the tile in initialization folder
-    output_filename = "tile_"
-    ras_clip = os.path.join(concave_path, concave_name+affix+'.tif')
-    d3dNewRaster2Tiles(ras_clip, concave_path, tile_size_x, tile_size_y, dir_out)
+    # 5.1 Tile surv_val raster
+    filename_surv = "tile_surv_"
+    ras_clip = os.path.join(concave_path, surv_val_name+affix+'.tif')
+    Sald3dNewRaster2Tiles(ras_clip, concave_path, tile_size_x, tile_size_y, dir_out, filename_surv)
+
+    #5.2 Tile sal_val raster
+    filename_sal = "tile_sal_"
+    ras_clip = os.path.join(concave_path, sal_val_name+affix+'.tif')
+    Sald3dNewRaster2Tiles(ras_clip, concave_path, tile_size_x, tile_size_y, dir_out, filename_sal)    
     
     ### 6. Create Mangrove Trees shp and tile
     # 6.1. createPointSHP(read_data, age_coupling0, concave_path, EPSG_Project) 
@@ -289,11 +313,23 @@ for ntime in range(int(coupling_ntimeUse)):
         os.makedirs(save_tiled_env)
     gdal_calc_path = os.path.join(gdal_path, 'gdal_calc.py')
     # calc_surv = '"0*(A==-999)"'
-    calc_sal = '"0*(A>-999)+35"'
+    # calc_sal = '"0*(A>-999)+35"'
     # val_no_data_surv = 0
+    # val_no_data_sal = 60
+    
+    # 8.1 Prepare Surv_Val Env Raster for MesoFON 
+    filename_surv_env = filename_surv+'*'     
+    end_name_surv = '_surv_'      
+    SalNew_func_createRaster4MesoFON(concave_path,save_tiled_env, 
+                                     filename_surv_env, dir_out, end_name_surv)
+    
+    # 8.2 Prepare Sal_Val Env Raster for MesoFON 
+    filename_sal_env = filename_sal+'*' 
+    end_name_sal = '_sal_'
     val_no_data_sal = 60
-            
-    _new_func_createRaster4MesoFON(concave_path,save_tiled_env, no_data_val, EPSG_Project, val_no_data_sal)
+    SalNew_Sal_func_createRaster4MesoFON(concave_path,save_tiled_env, 
+                                     filename_sal_env, dir_out, end_name_sal,
+                                     val_no_data_sal)
     
     ### 9. Replace the content in Unrolled_Param, batch_params.xml, and parameters.xml
     # function to replace the content of the file

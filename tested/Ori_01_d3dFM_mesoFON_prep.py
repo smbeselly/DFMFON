@@ -4,6 +4,10 @@ Created on Thu Jan  6 19:05:21 2022
 
 @author: sbe002
 
+This is the script for testing the coupling mode
+The script is stable, however it is saved here as a backup.
+To retain the commented script
+The one outside is the cleaned version.
 TODO belum nambah script untuk tambahan sediment karena biomass (daun jatuh, dll)
 """
 # =============================================================================
@@ -82,10 +86,17 @@ species_name = 'Avicennia_marina'
 LLWL = -1.2
 
 ## Check the complete_model.jar file and change this source file
+# for later to be updated with the new params file as generated during the preprocessing
+# Sal_Source = r'F:\Temp\MesoFONbatch_JDK11\Data_Trees_JDK11\Raster_Dummy_UTM_'
+# Surv_Source = r'F:\Temp\MesoFONbatch_JDK11\Data_Trees_JDK11\Raster_Dummy_UTM_Surv_'
+# Excel_Source = r'F:\Temp\MesoFONbatch_JDK11\Data_Trees_JDK11\test_trial.xls'
 Sal_Source = r'C:\Users\brian\git\macro_FON_220111\meso_FON\tile_20_20_sal_'
 Surv_Source = r'C:\Users\brian\git\macro_FON_220111\meso_FON\tile_20_20_surv_'
 Excel_Source = r'C:\Users\brian\git\macro_FON_220111\meso_FON\tile_20_20_trees_input.xls'
 
+# Sal_Source_Params = r"F:\GIT\Sebrian\macro_FON\meso_FON\Raster_Dummy_UTM_"
+# Surv_Source_Params = r"F:\GIT\Sebrian\macro_FON\meso_FON\Raster_Dummy_UTM_Surv_"
+# Excel_Source_Params = r"F:\Temp\MesoFONbatch\Data_Trees\test_trial.xls"
 
 #%% Read the domain and prepare the 'world' for MesoFON
 ##############
@@ -105,6 +116,19 @@ matrix = (matrix[~np.isnan(matrix).any(axis=1)])
 mat_hull = np.block([[matrix[:,0]],[matrix[:,1]]]).T 
 
 ### Observe the data first in QGIS and see what kind of concave hull that can be
+# created whether an automatic Concave Hull or manual delineation
+
+# =============================================================================
+# k_hull = 3 # the lowest number is 3,, you can do the trial and error depend on the model
+# import ConcaveHull as CH
+# polya = CH.concaveHull(mat_hull, k_hull)
+# 
+# # plt.plot(*polya.exterior.xy)    
+# 
+# # If concave hull method does not functioning well save the mathull and
+# # manually process the delineation
+# np.savetxt(str(dir_out)+ '\\mat_hull'+'.csv', mat_hull, delimiter=",", header='Lon,Lat',comments='')
+# =============================================================================
 
 # df = pd.read_csv(r'Model-Exchange/MesoFON-Env/Tiling/mat_hull_edit.csv')
 # mat_hull_df = df.to_numpy()
@@ -217,7 +241,9 @@ for filepath in glob.iglob(file_tile_trees): # looping for all with trees affix
     types_species = id_id+1 # this variable starts from 1 to N+1
     shiftedBelowPos = np.ones(len(posX))*1
     age = tile_0_read['age']
-
+    # age = np.ones(len(posX))*1 # should be derived from shapefile #TO DO will be added later
+    # rbh_m = (0.0015*height_m**2)+(0.0015*height_m) #dummy it uses equation in test_trial
+    # use the new dbh-height relationship  
     if height_m.size != 0:
         height_m = height_m.values  # in metre
         rbh_m = np.where(height_m < 1.37, f_0(height_m*100)/100/2, f_dbh(height_m*100)/100/2)
@@ -268,6 +294,12 @@ for filepath in glob.iglob(file_tile_trees): # looping for all with trees affix
     wb.save(xls_loc)
 
 #%% Copy and Place the payload.jar, and Prepare the Tiled xls to the designated folder
+# How the scripts work:
+# 1. Delete the existing folders, if exist
+# 2. Create new empty folders with the correct name, extract the jar, and copy the local_batch.properties
+# 3. Delete all content in folder initiate-rasters to make sure that we use the recent ones
+# 4. Create ideal raster for initialization: sal_, surv_ with gdal_calc
+# 5. Replace the content in Unrolled_Param, batch_params.xml, and parameters.xml
 
 file_tile_xls = os.path.join(save_tiled_trees,'tile_*_input.xls')
 
@@ -292,7 +324,8 @@ for filepath in glob.iglob(file_tile_xls): # looping for all with trees affix
  
 
 ### Create ideal rasters for initialization files
-
+# 1. delete all content in folder initiate-rasters
+# 2. create sal and surv rasters, make copies and give 0 and 1 suffix 
 save_tiled_env = os.path.join(MFON_Env,'Initiate-Rasters') # location to save the tiled shp
 try:
     send2trash.send2trash(save_tiled_env)
@@ -390,6 +423,20 @@ for filepatf in glob.iglob(os.path.join(MFON_Exchange,'Initialization','tile_*.t
     
 #%% Use os.system(command) to call Java from Python    
 
+# =============================================================================
+# dir_test = os.path.join(r'D:\Git\d3d_meso\Model-Execute\MesoFON\tile_0_0_trees_input')
+# # delete the existing instance1 in in the folder to prevent symlink errorp prior running
+# try:
+#     send2trash.send2trash(os.path.join(dir_test,'instance_1'))
+# except OSError as e:
+#     print("Error: %s : %s" % (os.path.join(dir_test,'instance_1'), e.strerror))
+# 
+# os.chdir(dir_test)
+# command_java = '{JAVAREP} -cp lib/* repast.simphony.batch.LocalDriver local_batch_run.properties'
+# os.system(command_java.format(JAVAREP=JAVAREP))
+# os.chdir(PROJ_HOME)
+# =============================================================================
+
 for filepatt in glob.iglob(os.path.join(MFON_HOME, 'tile_*')):
     # delete the existing instance1 in in the folder to prevent symlink errorp prior running
     try:
@@ -432,7 +479,13 @@ for nama_a in namae:
 Concat_table = pd.concat(all_df)
 # drop tick 0 year, only take 0.25
 Concat_table = Concat_table[Concat_table.tick > 0]
+# Check max Height_cm value
+Concat_table['Height_cm'].max()
 run_is = 'Coupling_0' # change this with the real name
 # Concatenated table is saved as txt file
 Concat_table.to_csv(os.path.join(MFON_OUT_compile,run_is+'.txt'), sep=',', index=False, header=True)
 
+# =============================================================================
+# x2 = datetime.datetime.now()
+# print(x2-x1) #total time 0:01:59.118135
+# =============================================================================
