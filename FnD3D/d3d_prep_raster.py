@@ -195,8 +195,8 @@ def d3dRaster2Tiles(out_path, output_filename, ras_clip, tile_size_x, tile_size_
     # ylen = res * ds.RasterYSize
     
     # size of a single tile
-    xsize_tile = int(tile_size_x/res) #num of pixels in tile_size_x
-    ysize_tile = int(tile_size_y/res) ##num of pixels in tile_size_y
+    xsize_tile = round(tile_size_x/res) #num of pixels in tile_size_x
+    ysize_tile = round(tile_size_y/res) ##num of pixels in tile_size_y
     
     # Tile the raster domain as the prefered tile size in meter
     for i in range(0, xsize, xsize_tile):
