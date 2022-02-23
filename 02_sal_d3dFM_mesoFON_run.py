@@ -10,6 +10,18 @@ This is the script for model include salinity
 #%% Reset all variable
 # Don't forget to %reset %clear
 
+#%% Input Folders and Files
+PROJ_HOME = r'D:\Git\d3d_meso'
+SYS_APP = r'D:\Git\d3d_meso/FnD3D'
+D3D_HOME = r'D:\Git\d3d_meso\Model-Execute\D3DFM\oss_artifacts_x64_140691'
+gdal_loc = r'D:\Program_Files\Anaconda3\envs\d3dfm_39\Lib\site-packages\osgeo_utils'
+JAVA_Exe = r'C:\Users\sbe002\RepastSimphony-2.8\eclipse\jdk11\bin\java.exe'
+
+D3D_Model = 'FunnelMorphMF30_Adjusted_Saline'
+D3D_Domain = 'Grid_Funnel_1_net.nc'
+config_xml = 'FunnelMorphMF30_Adjusted.xml'
+mdu_file = 'FlowFM.mdu'
+
 #%% Import the packages and set the file
 import numpy as np
 import numpy.ma as ma
@@ -21,7 +33,7 @@ import faulthandler
 faulthandler.enable()
 import sys
 # print(sys.path)
-sys.path.append('D:/Git/d3d_meso/FnD3D') # as this Func will be in the same folder, no longer needed
+sys.path.append(SYS_APP) # as this Func will be in the same folder, no longer needed
 
 from dfm_tools.get_nc import get_ncmodeldata
 from dfm_tools.io.polygon import Polygon
@@ -43,14 +55,14 @@ import shutil
 from scipy.interpolate import interp1d
 
 ## Set the paths for dll-files and input-files for DFM
-PROJ_HOME = os.path.join(r'D:\Git\d3d_meso')
-D3D_HOME = os.path.join(r'D:\Git\d3d_meso\Model-Execute\D3DFM\oss_artifacts_x64_140691')
+PROJ_HOME = os.path.join(PROJ_HOME)
+D3D_HOME = os.path.join(D3D_HOME)
 MFON_HOME = os.path.join(PROJ_HOME,'Model-Execute','MesoFON')
-D3D_workdir = os.path.join(PROJ_HOME,'Model-Execute','D3DFM','FunnelMorphMF30_Adjusted_Saline') # model funnel with morpho
+D3D_workdir = os.path.join(PROJ_HOME,'Model-Execute','D3DFM',D3D_Model) # model funnel with morpho
 # MFON_JAR = os.path.join(MFON_HOME, 'complete_model.jar')
 MFON_LocalBatchRunner = os.path.join(MFON_HOME,'local_batch_run.properties')
-gdal_path = os.path.join(r'D:\Program_Files\Anaconda3\envs\d3dfm_39\Lib\site-packages\osgeo_utils')
-JAVAREP = os.path.join(r'C:\Users\sbe002\RepastSimphony-2.8\eclipse\jdk11\bin\java.exe')
+gdal_path = os.path.join(gdal_loc)
+JAVAREP = os.path.join(JAVA_Exe)
 
 MFON_Exchange = os.path.join(PROJ_HOME,'Model-Exchange')
 MFON_Env = os.path.join(MFON_Exchange, 'MesoFON-Env')
@@ -90,10 +102,10 @@ Excel_Source = 'Initiate-Trees'
 dimr_path = os.path.join(D3D_HOME, 'dimr', 'bin', 'dimr_dll.dll')
 dflowfm_path = os.path.join(D3D_HOME, 'dflowfm','bin')
 dflowfm_engine = os.path.join(dflowfm_path, 'dflowfm.dll')
-config_file = os.path.join(D3D_workdir, 'FunnelMorphMF30_Adjusted.xml') # funnel morpho
+config_file = os.path.join(D3D_workdir, config_xml) # funnel morpho
 
-mdu_file = os.path.join(D3D_workdir, 'dflowfm', 'FlowFM.mdu')
-grid_file = os.path.join(D3D_workdir, 'dflowfm', 'Grid_Funnel_1_net.nc')
+mdu_file = os.path.join(D3D_workdir, 'dflowfm', mdu_file)
+grid_file = os.path.join(D3D_workdir, 'dflowfm', D3D_Domain)
 
 
 ### Access the information from mesh
@@ -139,9 +151,9 @@ xyzw_nodes = create_xyzwNodes(mesh_face_nodes,xyzw_cell_number)
 master_trees = gpd.read_file(os.path.join(MFON_Trees, 'Master-Trees', 'MangroveAgeMerged.shp'))
 
 #### Read the polygon pli and add the indices
-pli = Polygon.fromfile(os.path.join(D3D_workdir,'dflowfm','vege.pli'))
-path = mpltPath.Path(pli[0][0])
-ind = path.contains_points(np.transpose((xz,yz))).astype(int)
+# pli = Polygon.fromfile(os.path.join(D3D_workdir,'dflowfm','vege.pli'))
+# path = mpltPath.Path(pli[0][0])
+# ind = path.contains_points(np.transpose((xz,yz))).astype(int)
 
 #%% Read the compiled tree from the MesoFON Initialization Run and calculate drag_coefficient
 
@@ -158,7 +170,8 @@ age_coupling = calcAgeCoupling0(read_data, master_trees)
 drag_coeff = newCalcDraginLoop(xyzw_cell_number, xyzw_nodes, xk, yk, read_data, model_dfm)
 # assume that the boundary flow nodes are located at the end of array
 addition = np.zeros((model_dfm.get_var('ndx')-model_dfm.get_var('ndxi'))) + 0.005  
-drag_coeff = np.append(drag_coeff, addition)*ind 
+# drag_coeff = np.append(drag_coeff, addition)*ind
+drag_coeff = np.append(drag_coeff, addition)
 
 #%% Loop the Coupling
 # change from days to second
@@ -196,7 +209,8 @@ for ntime in range(int(coupling_ntimeUse)):
         salinity = np.append(salinity, np.reshape(sa1,(len(sa1),1)), axis=1)
         # calculate the drag coefficient
         drag_coeff = newCalcDraginLoop(xyzw_cell_number, xyzw_nodes, xk, yk, read_data, model_dfm)
-        drag_coeff = np.append(drag_coeff, addition)*ind  
+        # drag_coeff = np.append(drag_coeff, addition)*ind 
+        drag_coeff = np.append(drag_coeff, addition)
         # update the variable with new value
         model_dfm.set_var('Cdvegsp',drag_coeff)
         dts = model_dfm.get_time_step()

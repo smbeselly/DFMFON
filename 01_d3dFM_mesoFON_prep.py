@@ -10,6 +10,23 @@ TODO belum nambah script untuk tambahan sediment karena biomass (daun jatuh, dll
 # import datetime
 # x1 = datetime.datetime.now()
 # =============================================================================
+#%% Input Folders and Files
+PROJ_HOME = r'D:\Git\d3d_meso'
+SYS_APP = r'D:\Git\d3d_meso/FnD3D'
+D3D_HOME = r'C:\Program Files (x86)\Deltares\Delft3D Flexible Mesh Suite HMWQ (2021.04)\plugins\DeltaShell.Dimr\kernels\x64'
+gdal_loc = r'D:\Program_Files\Anaconda3\envs\d3dfm_39\Lib\site-packages\osgeo_utils'
+JAVA_Exe = r'C:\Users\sbe002\RepastSimphony-2.8\eclipse\jdk11\bin\java.exe'
+
+D3D_Model = 'FunnelMorphMF30_Adjusted'
+D3D_Domain = 'Grid_Funnel_1_net.nc'
+MFON_Folder = 'MesoFON_20220207'
+
+
+## Check the complete_model.jar file and change this source file
+Sal_Source = r'C:\Users\brian\git\macro_FON_220111\meso_FON\tile_20_20_sal_'
+Surv_Source = r'C:\Users\brian\git\macro_FON_220111\meso_FON\tile_20_20_surv_'
+Excel_Source = r'C:\Users\brian\git\macro_FON_220111\meso_FON\tile_20_20_trees_input.xls'
+
 #%% Import the necessary packages, set the file path, and input files
 
 import os
@@ -18,7 +35,7 @@ import numpy.ma as ma
 
 import sys
 print(sys.path)
-sys.path.append('D:/Git/d3d_meso/FnD3D') # as this Func will be in the same folder, no longer needed
+sys.path.append(SYS_APP) # as this Func will be in the same folder, no longer needed
 from d3d_prep_raster import d3dConcaveHull, d3dPolySHP, d3dCSV2ClippedRaster, d3dRaster2Tiles
 from dfm_tools.get_nc import get_netdata
 import matplotlib.pyplot as plt
@@ -42,15 +59,15 @@ import fileinput
 import re
 
 ## Set the paths for dll-files and input-files for DFM
-PROJ_HOME = os.path.join(r'D:\Git\d3d_meso')
-D3D_HOME = os.path.join(r'C:\Program Files (x86)\Deltares\Delft3D Flexible Mesh Suite HMWQ (2021.04)\plugins\DeltaShell.Dimr\kernels\x64')
+PROJ_HOME = os.path.join(PROJ_HOME)
+D3D_HOME = os.path.join(D3D_HOME)
 MFON_HOME = os.path.join(PROJ_HOME,'Model-Execute','MesoFON')
-D3D_workdir = os.path.join(PROJ_HOME,'Model-Execute','D3DFM','FunnelMorphMF30_Adjusted') # model funnel with morpho
+D3D_workdir = os.path.join(PROJ_HOME,'Model-Execute','D3DFM',D3D_Model) # model funnel with morpho
 # MFON_JAR = os.path.join(MFON_HOME, 'complete_model.jar')
-MFON_JAR = os.path.join(MFON_HOME, 'MesoFON_20220207','complete_model.jar')
+MFON_JAR = os.path.join(MFON_HOME, MFON_Folder,'complete_model.jar')
 MFON_LocalBatchRunner = os.path.join(MFON_HOME,'local_batch_run.properties')
-gdal_path = os.path.join(r'D:\Program_Files\Anaconda3\envs\d3dfm_39\Lib\site-packages\osgeo_utils')
-JAVAREP = os.path.join(r'C:\Users\sbe002\RepastSimphony-2.8\eclipse\jdk11\bin\java.exe')
+gdal_path = os.path.join(gdal_loc)
+JAVAREP = os.path.join(JAVA_Exe)
 
 MFON_Exchange = os.path.join(PROJ_HOME,'Model-Exchange')
 if not os.path.exists(MFON_Exchange):
@@ -72,7 +89,7 @@ if not os.path.exists(dir_out):
 ## settings
 
 EPSG_Project = 32749 # EPSG code for WGS84/ UTM Zone 49S (Porong case study)
-netcdf_domain = os.path.join(D3D_workdir, 'dflowfm', 'Grid_Funnel_1_net.nc')
+netcdf_domain = os.path.join(D3D_workdir, 'dflowfm', D3D_Domain)
 x_res = 10
 y_res = 10
 no_data_val = -999.0
@@ -80,12 +97,6 @@ tile_size_x = 200 # it is in meter
 tile_size_y = 200 # which reads info in pixel
 species_name = 'Avicennia_marina'
 LLWL = -1.2
-
-## Check the complete_model.jar file and change this source file
-Sal_Source = r'C:\Users\brian\git\macro_FON_220111\meso_FON\tile_20_20_sal_'
-Surv_Source = r'C:\Users\brian\git\macro_FON_220111\meso_FON\tile_20_20_surv_'
-Excel_Source = r'C:\Users\brian\git\macro_FON_220111\meso_FON\tile_20_20_trees_input.xls'
-
 
 #%% Read the domain and prepare the 'world' for MesoFON
 ##############
