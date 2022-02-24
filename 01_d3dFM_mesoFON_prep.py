@@ -16,6 +16,7 @@ SYS_APP = r'D:\Git\d3d_meso/FnD3D'
 D3D_HOME = r'C:\Program Files (x86)\Deltares\Delft3D Flexible Mesh Suite HMWQ (2021.04)\plugins\DeltaShell.Dimr\kernels\x64'
 gdal_loc = r'D:\Program_Files\Anaconda3\envs\d3dfm_39\Lib\site-packages\osgeo_utils'
 JAVA_Exe = r'C:\Users\sbe002\RepastSimphony-2.8\eclipse\jdk11\bin\java.exe'
+Mangr_SHP = 'MangroveAgeMerged.shp'
 
 D3D_Model = 'FunnelMorphMF30_Adjusted'
 D3D_Domain = 'Grid_Funnel_1_net.nc'
@@ -183,7 +184,7 @@ gc.collect() # to clear memory of variables in python after doing del(variables)
 shp_source = os.path.join(MFON_Trees, 'Master-Trees') #source of the complete trees location
 if not os.path.exists(shp_source):
     os.makedirs(shp_source)
-shp_source = os.path.join(shp_source, 'MangroveAgeMerged.shp') # name of the trees shp
+shp_source = os.path.join(shp_source, 'Mangr_SHP') # name of the trees shp
 
 folder_loc = dir_out # location of the master tiles
 file_tile = os.path.join(dir_out,'tile_*.shp' )

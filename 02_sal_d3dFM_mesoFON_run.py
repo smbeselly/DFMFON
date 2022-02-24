@@ -22,6 +22,8 @@ D3D_Domain = 'Grid_Funnel_1_net.nc'
 config_xml = 'FunnelMorphMF30_Adjusted.xml'
 mdu_file = 'FlowFM.mdu'
 
+Mangr_SHP = 'MangroveAgeMerged.shp'
+
 #%% Import the packages and set the file
 import numpy as np
 import numpy.ma as ma
@@ -148,7 +150,7 @@ xyzw_cell_number = create_xyzwCellNumber(xzw,yzw,mesh_face_x,mesh_face_y)
 xyzw_nodes = create_xyzwNodes(mesh_face_nodes,xyzw_cell_number)
 
 #### Read Master Trees
-master_trees = gpd.read_file(os.path.join(MFON_Trees, 'Master-Trees', 'MangroveAgeMerged.shp'))
+master_trees = gpd.read_file(os.path.join(MFON_Trees, 'Master-Trees', Mangr_SHP))
 
 #### Read the polygon pli and add the indices
 # pli = Polygon.fromfile(os.path.join(D3D_workdir,'dflowfm','vege.pli'))
