@@ -39,12 +39,14 @@ sys.path.append(SYS_APP) # as this Func will be in the same folder, no longer ne
 
 from dfm_tools.get_nc import get_ncmodeldata
 from dfm_tools.io.polygon import Polygon
+from dfm_tools.io.mdu import read_deltares_ini
 from d3d_meso_mangro import create_xyzwCellNumber, create_xyzwNodes #, calcDragCoeff 
 from d3d_meso_mangro import calcWOO, calcAgeCoupling0, createPointSHP #, createXLSfromSHP  
 from d3d_meso_mangro import modifyParamMesoFON #, createRaster4MesoFON, calcDragInLoop
 from d3d_meso_mangro import csv2ClippedRaster, Sald3dNewRaster2Tiles #, clipSHPcreateXLSfromGPD
 from d3d_meso_mangro import SalNew_func_createRaster4MesoFON, newCalcDraginLoop
 from d3d_meso_mangro import New_clipSHPcreateXLSfromGPD, SalNew_Sal_func_createRaster4MesoFON
+from d3d_mangro_seeds import index_veg, seedling_establishment, subsetting_cell
 
 os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE" #to prevent error in matplotlib
 
@@ -55,6 +57,9 @@ import send2trash
 import re
 import shutil
 from scipy.interpolate import interp1d
+from dateutil import parser
+import datetime
+import copy
 
 ## Set the paths for dll-files and input-files for DFM
 PROJ_HOME = os.path.join(PROJ_HOME)
@@ -175,6 +180,19 @@ addition = np.zeros((model_dfm.get_var('ndx')-model_dfm.get_var('ndxi'))) + 0.00
 # drag_coeff = np.append(drag_coeff, addition)*ind
 drag_coeff = np.append(drag_coeff, addition)
 
+#%% Get time reference from the model
+
+## get the reference date and starttime of model
+getmdu = read_deltares_ini(mdu_file)
+refdate = getmdu[(getmdu['section'] == 'time') & (getmdu['key'] == 'RefDate')]['value']
+tstart = getmdu[(getmdu['section'] == 'time') & (getmdu['key'] == 'TStart')]['value']
+
+# parse dfm's time in string to datetime var in Python
+refdatet = parser.parse(refdate.iloc[0])
+tstartt = datetime.timedelta(seconds=float(tstart.iloc[0]))
+#reference time is
+reftime = refdatet+tstartt
+
 #%% Loop the Coupling
 # change from days to second
 coupling_period = coupling_period*24*3600 
@@ -190,17 +208,63 @@ coupling_ntime = model_dfm.get_end_time()/coupling_period_model # how many coupl
 # not integer
 # if the number is not round use the floor value
 coupling_ntimeUse = np.floor(coupling_ntime) 
+curyr_check = 0
+list_seed2sapl = []
         
 for ntime in range(int(coupling_ntimeUse)):
     # do the calculation for each coupling_ntime
     print('Start the coupling',str(ntime+1),'computation')
-    ### 1. run the DFM all the simulation time within ntime
+    ### 1.1. run the DFM all the simulation time within ntime
     # update the variable with new value taken from previous drag calculation
     model_dfm.set_var('Cdvegsp',drag_coeff)
     water_level = np.empty((len(xz),0)) 
     salinity = np.empty((len(xz),0)) 
     #https://www.delftstack.com/howto/numpy/python-numpy-empty-array-append/
+    res_x = np.empty((len(xz),0))
+    res_y = np.empty((len(xz),0))
+    
+    # calculate cells that have vegetation
+    index_veg_cel = index_veg(model_dfm, xyzw_cell_number, xyzw_nodes, xk, yk, read_data)
+    
+    # update seedlings age
+    try:
+        list_seed2sapl.append(seedling_finalpos)
+        seed2sapl = pd.concat(list_seed2sapl, axis=0)
+        # add age to the appended pandas
+        seed2sapl['Age'] = seed2sapl['Age']+datetime.timedelta(days = coupling_period)
 
+        try:
+            # select seedlings that have been transformed to saplings
+            now_as_saplings = seed2sapl[seed2sapl['Age'] >= datetime.timedelta(days = 730)]
+            now_as_saplings['Age'] = now_as_saplings['Age']/datetime.timedelta(days=730)
+            now_as_saplings['dbh_cm'] = 0.003
+            now_as_saplings['Height_cm'] = 100
+            
+            # update the read data with new saplings as mature mangroves
+            read_data = pd.concat([read_data, now_as_saplings], axis=0, ignore_index=True)
+            
+            # reset list to use the filterd list from current selection
+            # filter for less than 730
+            seed2sapl = seed2sapl[seed2sapl['Age'] <= datetime.timedelta(days = 730)]
+            list_seed2sapl = []
+            
+        except:
+            print("The seedlings' age is less than 2 years")
+    except:
+        print('seedlings production is not yet initiated')
+
+    
+    ### 1.2. Check for seedling establishment
+    # seedling establishment only occur during fruiting season (January)
+    # current simulation time is
+    cursec = datetime.timedelta(seconds=model_dfm.get_current_time()) #https://stackoverflow.com/questions/775049/how-do-i-convert-seconds-to-hours-minutes-and-seconds
+    # current simulation time multiply by MF
+    cursecMF = cursec*MorFac
+    # current month based on simulation time (with MF)
+    curyr = ((refdatet+cursecMF).strftime('%Y'))
+    curmonth = ((refdatet+cursecMF).strftime('%m'))
+    print('simulation date with MF is', ((refdatet+cursecMF).strftime('%Y%m%d %HH:%MM:%SS')))    
+       
     t=0 # since the time step in DFM is flexible, therefore use this approach.
     while t<coupling_period_model:
         model_dimr.update()
@@ -209,6 +273,24 @@ for ntime in range(int(coupling_ntimeUse)):
         # store the maximum water level per time step in column wise
         water_level = np.append(water_level, np.reshape(s1,(len(s1),1)), axis=1)
         salinity = np.append(salinity, np.reshape(sa1,(len(sa1),1)), axis=1)
+        
+        ## check to apply seedling establishment
+        if curmonth == '01' and curyr_check == 0:
+            print('calculate seedlings establishment')
+            vel_x = model_dfm.get_var('ucx') # velocity x
+            vel_y = model_dfm.get_var('ucy') # velocity y
+            res_x = np.append(res_x, np.reshape(vel_x,(len(vel_x),1)), axis=1)
+            res_y = np.append(res_y, np.reshape(vel_y,(len(vel_y),1)), axis=1)      
+        elif curyr_check != 0:
+            if curmonth == '01' and curyr != curyr_check:
+                print('calculate seedlings establishment')
+                vel_x = model_dfm.get_var('ucx') # velocity x
+                vel_y = model_dfm.get_var('ucy') # velocity y
+                res_x = np.append(res_x, np.reshape(vel_x,(len(vel_x),1)), axis=1)
+                res_y = np.append(res_y, np.reshape(vel_y,(len(vel_y),1)), axis=1)       
+            else:
+                print(curyr, '/', curmonth, 'no seedlings establishment')
+            
         # calculate the drag coefficient
         drag_coeff = newCalcDraginLoop(xyzw_cell_number, xyzw_nodes, xk, yk, read_data, model_dfm)
         # drag_coeff = np.append(drag_coeff, addition)*ind 
@@ -218,6 +300,66 @@ for ntime in range(int(coupling_ntimeUse)):
         dts = model_dfm.get_time_step()
         t=t+dts
         print('Coupling ',ntime, 'run ', t, '/', coupling_period_model)
+    
+   
+    med_sal = np.median(salinity, axis=1)
+    
+    # function to calculate residual current
+    def calculate_residual(the_res, the_ts):
+        x_test = []
+        for column in range(the_res.shape[1]-1):
+            x_sum = the_res[:,column:column+2].sum(axis=1)/the_ts
+            x_test.append(x_sum)
+        # x_test = np.asarray(x_test).T
+        residual_of = np.median(x_test)
+        
+        return residual_of
+    
+    res_of_x = calculate_residual(res_x, model_dfm.get_time_step())
+    res_of_y = calculate_residual(res_y, model_dfm.get_time_step())
+    # create matrix (array)
+    residual_is = np.hstack((res_of_x,res_of_y))
+    
+    # check condition
+    if curmonth == '01' and curyr_check == 0:
+        list_of_seeds = []
+        for row in range(len(xyzw_cell_number)):
+            if index_veg_cel[row] == 1:
+                read_data_subset = subsetting_cell(xyzw_cell_number, row, 
+                                                   xyzw_nodes, xk, yk, read_data)  
+                
+                seedss = seedling_establishment(read_data_subset)
+                Nn = seedss.establishment_avicennia(med_sal[row])
+                seedling_pos = seedss.seedlings_drift(Nn, residual_is[row],
+                                                      model_dfm.get_time_step())
+                list_of_seeds.append(seedling_pos)
+        
+        seedling_finalpos = pd.concat(list_of_seeds, axis=0)
+        seedling_finalpos['Age'] = datetime.timedelta(days = 0)
+
+    elif curyr_check != 0:
+        if curmonth == '01' and curyr != curyr_check:
+            list_of_seeds = []
+            for row in range(len(xyzw_cell_number)):
+                if index_veg_cel[row] == 1:
+                    read_data_subset = subsetting_cell(xyzw_cell_number, row, 
+                                                       xyzw_nodes, xk, yk, read_data)  
+                    
+                    seedss = seedling_establishment(read_data_subset)
+                    Nn = seedss.establishment_avicennia(med_sal[row])
+                    seedling_pos = seedss.seedlings_drift(Nn, residual_is[row],
+                                                          model_dfm.get_time_step())
+                    list_of_seeds.append(seedling_pos)
+            
+            seedling_finalpos = pd.concat(list_of_seeds, axis=0)
+            seedling_finalpos['Age'] = datetime.timedelta(days = 0)
+    
+    # 1.3. Prepare pandas for list of the seedling_finalpos
+    # modify the column name
+    seedling_finalpos = seedling_finalpos.rename(columns={'seedsPosX':'GeoRefPosX',
+                                                  'seedsPosY':'GeoRefPosY'})
+    seedling_finalpos['Created Time Stamp'] = reftime + cursec
+    
     
     ### 2. convert the water_level from each time_step to each day
     # calculate the x axis of the array of the default run
@@ -269,7 +411,7 @@ for ntime in range(int(coupling_ntimeUse)):
     # find median value of the h_wl for each cell number
     med_h_wl = np.median(h_wl, axis=1) 
     # find median value of salinity for each cell number
-    med_sal = np.median(salinity, axis=1)
+    med_sal = med_sal
     
     # calculate WoO probability value from h_wl (daily max water level)
     surv_val = np.empty(len(med_h_wl)) #initiate an empty array
@@ -414,6 +556,9 @@ for ntime in range(int(coupling_ntimeUse)):
     # 13.1. use spatial in scipy to match the x,y of the mangroves and the age information.
     master_trees = gpd.read_file(os.path.join(concave_path+str('\\')+Path(concave_path).stem+'.shp'))
     age_coupling = calcAgeCoupling0(read_data, master_trees) # prepare the age_coupling for the Master Trees of Each Coupling procedure
+    
+    print('End of coupling',str(ntime+1))
+    print('Date now with MF is', ((refdatet+cursecMF).strftime('%Y%m%d %HH:%MM:%SS'))) 
 
     
 ### End Loop
