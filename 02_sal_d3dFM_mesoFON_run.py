@@ -17,12 +17,12 @@ D3D_HOME = r'D:\Git\d3d_meso\Model-Execute\D3DFM\oss_artifacts_x64_140691'
 gdal_loc = r'D:\Program_Files\Anaconda3\envs\d3dfm_39\Lib\site-packages\osgeo_utils'
 JAVA_Exe = r'C:\Users\sbe002\RepastSimphony-2.8\eclipse\jdk11\bin\java.exe'
 
-D3D_Model = 'FunnelMorphMF30_Adjusted_Saline'
+D3D_Model = 'FunnelMorphMF30_Adjusted_Saline_geser'
 D3D_Domain = 'Grid_Funnel_1_net.nc'
-config_xml = 'FunnelMorphMF30_Adjusted.xml'
+config_xml = 'FunnelMorphMF30_Adjusted_Saline_geser.xml'
 mdu_file = 'FlowFM.mdu'
 
-Mangr_SHP = 'MangroveAgeMerged.shp'
+Mangr_SHP = 'geserMangroveAgeMerged.shp'
 
 #%% Import the packages and set the file
 import numpy as np
@@ -171,7 +171,8 @@ read_data['Height_cm'] = read_data['Height_cm']
 
 # use spatial in scipy to match the x,y of the mangroves and the age information.
 # age_coupling0 = calcAgeCoupling0(read_data, master_trees)
-age_coupling = calcAgeCoupling0(read_data, master_trees)
+# age_coupling = calcAgeCoupling0(read_data, master_trees)
+age_coupling = read_data['Age']
 
 # For loop for all of the cell number
 drag_coeff = newCalcDraginLoop(xyzw_cell_number, xyzw_nodes, xk, yk, read_data, model_dfm)
@@ -223,19 +224,47 @@ for ntime in range(int(coupling_ntimeUse)):
     res_x = np.empty((len(xz),0))
     res_y = np.empty((len(xz),0))
     
-    # calculate cells that have vegetation
+    # find cells that have vegetation
     index_veg_cel = index_veg(model_dfm, xyzw_cell_number, xyzw_nodes, xk, yk, read_data)
     
     # update seedlings age
+    # try:
+    #     # list_seed2sapl.append(seedling_finalpos)
+    #     # seed2sapl = pd.concat(list_seed2sapl, axis=0)
+    #     # add age to the appended pandas
+    #     add_seeds_age = coupling_period / (24*3600)
+    #     seed2sapl['Age'] = seed2sapl['Age']+datetime.timedelta(days = add_seeds_age)
+
+    #     try:
+    #         # select seedlings that have been transformed to saplings
+    #         now_as_saplings = seed2sapl[seed2sapl['Age'] >= datetime.timedelta(days = 730)]
+    #         now_as_saplings['Age'] = now_as_saplings['Age']/datetime.timedelta(days=730)
+    #         now_as_saplings['dbh_cm'] = 0.003
+    #         now_as_saplings['Height_cm'] = 100
+            
+    #         # update the read data with new saplings as mature mangroves
+    #         read_data = pd.concat([read_data, now_as_saplings], axis=0, ignore_index=True)
+            
+    #         # reset list to use the filterd list from current selection
+    #         # filter for less than 730
+    #         seed2sapl = seed2sapl[seed2sapl['Age'] <= datetime.timedelta(days = 730)]
+    #         list_seed2sapl = []
+            
+    #     except:
+    #         print("The seedlings' age is less than 2 years")
+    # except:
+    #     print('seedlings production is not yet initiated (1st run)')
     try:
         list_seed2sapl.append(seedling_finalpos)
         seed2sapl = pd.concat(list_seed2sapl, axis=0)
         # add age to the appended pandas
-        seed2sapl['Age'] = seed2sapl['Age']+datetime.timedelta(days = coupling_period)
+        add_seeds_age = coupling_period / (24*3600)
+        seed2sapl['Age'] = seed2sapl['Age']+datetime.timedelta(days = add_seeds_age)
+        
+        now_as_saplings = seed2sapl[seed2sapl['Age'] >= datetime.timedelta(days = 730)]
 
-        try:
+        if now_as_saplings.size > 0:
             # select seedlings that have been transformed to saplings
-            now_as_saplings = seed2sapl[seed2sapl['Age'] >= datetime.timedelta(days = 730)]
             now_as_saplings['Age'] = now_as_saplings['Age']/datetime.timedelta(days=730)
             now_as_saplings['dbh_cm'] = 0.003
             now_as_saplings['Height_cm'] = 100
@@ -248,10 +277,10 @@ for ntime in range(int(coupling_ntimeUse)):
             seed2sapl = seed2sapl[seed2sapl['Age'] <= datetime.timedelta(days = 730)]
             list_seed2sapl = []
             
-        except:
+        else:
             print("The seedlings' age is less than 2 years")
     except:
-        print('seedlings production is not yet initiated')
+        print('seedlings production is not yet initiated (1st run)')
 
     
     ### 1.2. Check for seedling establishment
@@ -299,24 +328,30 @@ for ntime in range(int(coupling_ntimeUse)):
         model_dfm.set_var('Cdvegsp',drag_coeff)
         dts = model_dfm.get_time_step()
         t=t+dts
-        print('Coupling ',ntime, 'run ', t, '/', coupling_period_model)
+        print('Coupling ',str(ntime+1), 'run ', t, '/', coupling_period_model)
     
    
     med_sal = np.median(salinity, axis=1)
     
-    # function to calculate residual current
+    # function to calculate residual current   
     def calculate_residual(the_res, the_ts):
-        x_test = []
+        x_test = np.empty((len(xz),0))
         for column in range(the_res.shape[1]-1):
             x_sum = the_res[:,column:column+2].sum(axis=1)/the_ts
-            x_test.append(x_sum)
-        # x_test = np.asarray(x_test).T
-        residual_of = np.median(x_test)
+            x_test = np.append(x_test, np.reshape(x_sum,(len(x_sum),1)), axis=1)
+        residual_of = np.median(x_test, axis=1)
         
         return residual_of
     
-    res_of_x = calculate_residual(res_x, model_dfm.get_time_step())
-    res_of_y = calculate_residual(res_y, model_dfm.get_time_step())
+    # x_test = np.empty((len(xz),0))
+    # for column in range(res_x.shape[1]-1): 
+    #     x_sum = res_x[:,column:column+2].sum(axis=1)/model_dfm.get_time_step()
+    #     x_test = np.append(x_test, np.reshape(x_sum,(len(x_sum),1)), axis=1)
+    # res_of_x = np.median(x_test, axis=1)
+        
+    
+    res_of_x = calculate_residual(res_x, model_dfm.get_time_step()).reshape((len(res_x),1))
+    res_of_y = calculate_residual(res_y, model_dfm.get_time_step()).reshape((len(res_y),1))
     # create matrix (array)
     residual_is = np.hstack((res_of_x,res_of_y))
     
@@ -327,12 +362,12 @@ for ntime in range(int(coupling_ntimeUse)):
             if index_veg_cel[row] == 1:
                 read_data_subset = subsetting_cell(xyzw_cell_number, row, 
                                                    xyzw_nodes, xk, yk, read_data)  
-                
                 seedss = seedling_establishment(read_data_subset)
                 Nn = seedss.establishment_avicennia(med_sal[row])
-                seedling_pos = seedss.seedlings_drift(Nn, residual_is[row],
-                                                      model_dfm.get_time_step())
-                list_of_seeds.append(seedling_pos)
+                if Nn.size > 0:
+                    seedling_pos = seedss.seedlings_drift(Nn, residual_is[row],
+                                                          model_dfm.get_time_step())
+                    list_of_seeds.append(seedling_pos)
         
         seedling_finalpos = pd.concat(list_of_seeds, axis=0)
         seedling_finalpos['Age'] = datetime.timedelta(days = 0)
@@ -344,12 +379,12 @@ for ntime in range(int(coupling_ntimeUse)):
                 if index_veg_cel[row] == 1:
                     read_data_subset = subsetting_cell(xyzw_cell_number, row, 
                                                        xyzw_nodes, xk, yk, read_data)  
-                    
                     seedss = seedling_establishment(read_data_subset)
                     Nn = seedss.establishment_avicennia(med_sal[row])
-                    seedling_pos = seedss.seedlings_drift(Nn, residual_is[row],
-                                                          model_dfm.get_time_step())
-                    list_of_seeds.append(seedling_pos)
+                    if Nn.size > 0:
+                        seedling_pos = seedss.seedlings_drift(Nn, residual_is[row],
+                                                              model_dfm.get_time_step())
+                        list_of_seeds.append(seedling_pos)
             
             seedling_finalpos = pd.concat(list_of_seeds, axis=0)
             seedling_finalpos['Age'] = datetime.timedelta(days = 0)
@@ -359,6 +394,7 @@ for ntime in range(int(coupling_ntimeUse)):
     seedling_finalpos = seedling_finalpos.rename(columns={'seedsPosX':'GeoRefPosX',
                                                   'seedsPosY':'GeoRefPosY'})
     seedling_finalpos['Created Time Stamp'] = reftime + cursec
+    seedling_finalpos = seedling_finalpos.reset_index(drop=True)
     
     
     ### 2. convert the water_level from each time_step to each day
@@ -547,15 +583,18 @@ for ntime in range(int(coupling_ntimeUse)):
     Concat_table = Concat_table[Concat_table.tick > 0]
     run_is = 'Coupling_'+str(ntime+1) # change this with the real name
     
-    # 12.2. Concatenated table is saved as txt file
+    # 12.2. use spatial in scipy to match the x,y of the mangroves and the age information.
+    master_trees = gpd.read_file(os.path.join(concave_path+str('\\')+Path(concave_path).stem+'.shp'))
+    age_coupling = calcAgeCoupling0(Concat_table, master_trees) # prepare the age_coupling for the Master Trees of Each Coupling procedure
+    Concat_table['Age'] = age_coupling #update age after MesoFON run
+    Concat_table.drop(['tick'], inplace=True, axis=1)
+    Concat_table = Concat_table.reset_index(drop=True) # reset the index
+    
+    # 12.3. Concatenated table is saved as txt file
     Concat_table.to_csv(os.path.join(MFON_OUT_compile, run_is+'.txt'), sep=',', index=False, header=True)
     
     ### 13. Read the compile txt file and create the Cd
-    read_data = Concat_table
-    
-    # 13.1. use spatial in scipy to match the x,y of the mangroves and the age information.
-    master_trees = gpd.read_file(os.path.join(concave_path+str('\\')+Path(concave_path).stem+'.shp'))
-    age_coupling = calcAgeCoupling0(read_data, master_trees) # prepare the age_coupling for the Master Trees of Each Coupling procedure
+    read_data = Concat_table  
     
     print('End of coupling',str(ntime+1))
     print('Date now with MF is', ((refdatet+cursecMF).strftime('%Y%m%d %HH:%MM:%SS'))) 

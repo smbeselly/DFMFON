@@ -16,9 +16,9 @@ SYS_APP = r'D:\Git\d3d_meso/FnD3D'
 D3D_HOME = r'C:\Program Files (x86)\Deltares\Delft3D Flexible Mesh Suite HMWQ (2021.04)\plugins\DeltaShell.Dimr\kernels\x64'
 gdal_loc = r'D:\Program_Files\Anaconda3\envs\d3dfm_39\Lib\site-packages\osgeo_utils'
 JAVA_Exe = r'C:\Users\sbe002\RepastSimphony-2.8\eclipse\jdk11\bin\java.exe'
-Mangr_SHP = 'MangroveAgeMerged.shp'
+Mangr_SHP = 'geserMangroveAgeMerged.shp'
 
-D3D_Model = 'FunnelMorphMF30_Adjusted'
+D3D_Model = 'FunnelMorphMF30_Adjusted_Saline_geser'
 D3D_Domain = 'Grid_Funnel_1_net.nc'
 MFON_Folder = 'MesoFON_20220207'
 
@@ -39,6 +39,7 @@ print(sys.path)
 sys.path.append(SYS_APP) # as this Func will be in the same folder, no longer needed
 from d3d_prep_raster import d3dConcaveHull, d3dPolySHP, d3dCSV2ClippedRaster, d3dRaster2Tiles
 from dfm_tools.get_nc import get_netdata
+from d3d_meso_mangro import calcAgeCoupling0
 import matplotlib.pyplot as plt
 plt.close('all')
 
@@ -184,7 +185,7 @@ gc.collect() # to clear memory of variables in python after doing del(variables)
 shp_source = os.path.join(MFON_Trees, 'Master-Trees') #source of the complete trees location
 if not os.path.exists(shp_source):
     os.makedirs(shp_source)
-shp_source = os.path.join(shp_source, 'Mangr_SHP') # name of the trees shp
+shp_source = os.path.join(shp_source, Mangr_SHP) # name of the trees shp
 
 folder_loc = dir_out # location of the master tiles
 file_tile = os.path.join(dir_out,'tile_*.shp' )
@@ -445,6 +446,14 @@ Concat_table = pd.concat(all_df)
 # drop tick 0 year, only take 0.25
 Concat_table = Concat_table[Concat_table.tick > 0]
 run_is = 'Coupling_0' # change this with the real name
+
+# use spatial in scipy to match the x,y of the mangroves and the age information.
+master_trees = gpd.read_file(shp_source)
+age_coupling = calcAgeCoupling0(Concat_table, master_trees)
+Concat_table['Age'] = age_coupling #update age after MesoFON run
+Concat_table.drop(['tick'], inplace=True, axis=1)
+Concat_table = Concat_table.reset_index(drop=True) # reset the index
+
 # Concatenated table is saved as txt file
 Concat_table.to_csv(os.path.join(MFON_OUT_compile,run_is+'.txt'), sep=',', index=False, header=True)
 

@@ -6,7 +6,7 @@ Created on Fri Mar  4 11:26:40 2022
 """
 
 import numpy as np
-import nump.ma as ma
+import numpy.ma as ma
 import pandas as pd
 import random
 import math
@@ -54,6 +54,7 @@ class seedling_establishment():
         ui = 72
         D = 0.006
         f_sal_red = 1/(1+np.exp(d*(ui-salinity_value)))
+        # self.data_mangrove['Species'] = self.data_mangrove['Species'].astype('str')
         avicennia_only = self.data_mangrove[(self.data_mangrove['Species'].str.contains("Avicennia_marina")) & 
                                             (self.data_mangrove['Age'] >= 4)]        
         N = round(f_sal_red*D*avicennia_only['CrownSurfaceArea_m2'])
@@ -74,7 +75,8 @@ class seedling_establishment():
             ran_radius = data_n['CrownSurfaceArea_m2'][n_point]
             pos_x = data_n['GeoRefPosX'][n_point]
             pos_y = data_n['GeoRefPosY'][n_point]
-            r, theta = [math.sqrt(random.randint(0,ran_radius))*math.sqrt(ran_radius), 2*math.pi*random.random()]
+            # r, theta = [math.sqrt(random.randint(0,ran_radius))*math.sqrt(ran_radius), 2*math.pi*random.random()]
+            r, theta = [math.sqrt(random.uniform(0,ran_radius))*math.sqrt(ran_radius), 2*math.pi*random.random()]
             xxi = pos_x + r * math.cos(theta) 
             yyi = pos_y + r * math.sin(theta)
 
@@ -88,8 +90,8 @@ class seedling_establishment():
             # final_position = np.column_stack((finalPosX,finalPosY))
             # final_position = pd.DataFrame({'seedsPosX': finalPosX, 'seedsPosY': finalPosY, 'seedsAge':seedsAge})
             final_position = pd.DataFrame({'seedsPosX': finalPosX, 'seedsPosY': finalPosY})
-            
-        final_position['Species']=data_n['Species']
+            final_position['Species']=data_n['Species']            
+        
         return final_position
 
 def subsetting_cell(xyzw_cell_number, row, xyzw_nodes, xk, yk, read_data):
