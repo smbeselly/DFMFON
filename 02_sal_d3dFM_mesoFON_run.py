@@ -81,6 +81,9 @@ dir_out = os.path.join(MFON_Exchange, 'Initialization')
 figsavefolder= os.path.join(PROJ_HOME,'Model-Out','Figures')
 if not os.path.exists(figsavefolder):
     os.makedirs(figsavefolder)
+seedlings_out = os.path.join(PROJ_HOME,'Model-Out','MesoFON', 'Seedlings')
+if not os.path.exists(seedlings_out):
+    os.makedirs(seedlings_out)
 #%% Settings
 EPSG_Project = 32749 # EPSG code for WGS84/ UTM Zone 49S (Porong case study)
 coupling_period = 30 #days, actually 90 days
@@ -175,7 +178,9 @@ read_data['Height_cm'] = read_data['Height_cm']
 age_coupling = read_data['Age']
 
 # For loop for all of the cell number
-drag_coeff = newCalcDraginLoop(xyzw_cell_number, xyzw_nodes, xk, yk, read_data, model_dfm)
+index_veg_cel = index_veg(model_dfm, xyzw_cell_number, xyzw_nodes, xk, yk, read_data)
+drag_coeff = newCalcDraginLoop(xyzw_cell_number, xyzw_nodes, xk, yk, 
+                               read_data, model_dfm, index_veg_cel)
 # assume that the boundary flow nodes are located at the end of array
 addition = np.zeros((model_dfm.get_var('ndx')-model_dfm.get_var('ndxi'))) + 0.005  
 # drag_coeff = np.append(drag_coeff, addition)*ind
@@ -227,33 +232,7 @@ for ntime in range(int(coupling_ntimeUse)):
     # find cells that have vegetation
     index_veg_cel = index_veg(model_dfm, xyzw_cell_number, xyzw_nodes, xk, yk, read_data)
     
-    # update seedlings age
-    # try:
-    #     # list_seed2sapl.append(seedling_finalpos)
-    #     # seed2sapl = pd.concat(list_seed2sapl, axis=0)
-    #     # add age to the appended pandas
-    #     add_seeds_age = coupling_period / (24*3600)
-    #     seed2sapl['Age'] = seed2sapl['Age']+datetime.timedelta(days = add_seeds_age)
-
-    #     try:
-    #         # select seedlings that have been transformed to saplings
-    #         now_as_saplings = seed2sapl[seed2sapl['Age'] >= datetime.timedelta(days = 730)]
-    #         now_as_saplings['Age'] = now_as_saplings['Age']/datetime.timedelta(days=730)
-    #         now_as_saplings['dbh_cm'] = 0.003
-    #         now_as_saplings['Height_cm'] = 100
-            
-    #         # update the read data with new saplings as mature mangroves
-    #         read_data = pd.concat([read_data, now_as_saplings], axis=0, ignore_index=True)
-            
-    #         # reset list to use the filterd list from current selection
-    #         # filter for less than 730
-    #         seed2sapl = seed2sapl[seed2sapl['Age'] <= datetime.timedelta(days = 730)]
-    #         list_seed2sapl = []
-            
-    #     except:
-    #         print("The seedlings' age is less than 2 years")
-    # except:
-    #     print('seedlings production is not yet initiated (1st run)')
+    
     try:
         list_seed2sapl.append(seedling_finalpos)
         seed2sapl = pd.concat(list_seed2sapl, axis=0)
@@ -321,7 +300,8 @@ for ntime in range(int(coupling_ntimeUse)):
                 print(curyr, '/', curmonth, 'no seedlings establishment')
             
         # calculate the drag coefficient
-        drag_coeff = newCalcDraginLoop(xyzw_cell_number, xyzw_nodes, xk, yk, read_data, model_dfm)
+        drag_coeff = newCalcDraginLoop(xyzw_cell_number, xyzw_nodes, xk, yk, 
+                                       read_data, model_dfm, index_veg_cel)
         # drag_coeff = np.append(drag_coeff, addition)*ind 
         drag_coeff = np.append(drag_coeff, addition)
         # update the variable with new value
@@ -342,12 +322,6 @@ for ntime in range(int(coupling_ntimeUse)):
         residual_of = np.median(x_test, axis=1)
         
         return residual_of
-    
-    # x_test = np.empty((len(xz),0))
-    # for column in range(res_x.shape[1]-1): 
-    #     x_sum = res_x[:,column:column+2].sum(axis=1)/model_dfm.get_time_step()
-    #     x_test = np.append(x_test, np.reshape(x_sum,(len(x_sum),1)), axis=1)
-    # res_of_x = np.median(x_test, axis=1)
         
     
     res_of_x = calculate_residual(res_x, model_dfm.get_time_step()).reshape((len(res_x),1))
@@ -355,47 +329,72 @@ for ntime in range(int(coupling_ntimeUse)):
     # create matrix (array)
     residual_is = np.hstack((res_of_x,res_of_y))
     
+    # 1.3. Prepare pandas for list of the seedling_finalpos
+    from d3d_mangro_seeds import seedling_dispersal
     # check condition
     if curmonth == '01' and curyr_check == 0:
-        list_of_seeds = []
-        for row in range(len(xyzw_cell_number)):
-            if index_veg_cel[row] == 1:
-                read_data_subset = subsetting_cell(xyzw_cell_number, row, 
-                                                   xyzw_nodes, xk, yk, read_data)  
-                seedss = seedling_establishment(read_data_subset)
-                Nn = seedss.establishment_avicennia(med_sal[row])
-                if Nn.size > 0:
-                    seedling_pos = seedss.seedlings_drift(Nn, residual_is[row],
-                                                          model_dfm.get_time_step())
-                    list_of_seeds.append(seedling_pos)
+        seedling_finalpos = seedling_dispersal(xyzw_cell_number, index_veg_cel, 
+                                               xyzw_nodes, xk, yk, read_data, 
+                                               med_sal, residual_is, model_dfm, 
+                                               reftime, cursec)
+        seedling_finalpos.to_csv(os.path.join(seedlings_out, 
+                                'Seedling_Coupling_'+str(ntime+1)+'.txt'), 
+                                 sep=',', index=False, header=True)
+        # list_of_seeds = []
+        # for row in range(len(xyzw_cell_number)):
+        #     if index_veg_cel[row] == 1:
+        #         read_data_subset = subsetting_cell(xyzw_cell_number, row, 
+        #                                            xyzw_nodes, xk, yk, read_data)  
+        #         seedss = seedling_establishment(read_data_subset)
+        #         Nn = seedss.establishment_avicennia(med_sal[row])
+        #         if Nn.size > 0:
+        #             seedling_pos = seedss.seedlings_drift(Nn, residual_is[row],
+        #                                                   model_dfm.get_time_step())
+        #             list_of_seeds.append(seedling_pos)
         
-        seedling_finalpos = pd.concat(list_of_seeds, axis=0)
-        seedling_finalpos['Age'] = datetime.timedelta(days = 0)
+        # seedling_finalpos = pd.concat(list_of_seeds, axis=0)
+        # seedling_finalpos['Age'] = datetime.timedelta(days = 0)
+        # # modify the column name
+        # seedling_finalpos = seedling_finalpos.rename(columns={'seedsPosX':'GeoRefPosX',
+        #                                               'seedsPosY':'GeoRefPosY'})
+        # seedling_finalpos['Created Time Stamp'] = reftime + cursec
+        # seedling_finalpos = seedling_finalpos.reset_index(drop=True)
 
     elif curyr_check != 0:
         if curmonth == '01' and curyr != curyr_check:
-            list_of_seeds = []
-            for row in range(len(xyzw_cell_number)):
-                if index_veg_cel[row] == 1:
-                    read_data_subset = subsetting_cell(xyzw_cell_number, row, 
-                                                       xyzw_nodes, xk, yk, read_data)  
-                    seedss = seedling_establishment(read_data_subset)
-                    Nn = seedss.establishment_avicennia(med_sal[row])
-                    if Nn.size > 0:
-                        seedling_pos = seedss.seedlings_drift(Nn, residual_is[row],
-                                                              model_dfm.get_time_step())
-                        list_of_seeds.append(seedling_pos)
+            seedling_finalpos = seedling_dispersal(xyzw_cell_number, index_veg_cel, 
+                                                   xyzw_nodes, xk, yk, read_data, 
+                                                   med_sal, residual_is, model_dfm, 
+                                                   reftime, cursec)
+            seedling_finalpos.to_csv(os.path.join(seedlings_out, 
+                                    'Seedling_Coupling_'+str(ntime+1)+'.txt'), 
+                                     sep=',', index=False, header=True)
+            # list_of_seeds = []
+            # for row in range(len(xyzw_cell_number)):
+            #     if index_veg_cel[row] == 1:
+            #         read_data_subset = subsetting_cell(xyzw_cell_number, row, 
+            #                                            xyzw_nodes, xk, yk, read_data)  
+            #         seedss = seedling_establishment(read_data_subset)
+            #         Nn = seedss.establishment_avicennia(med_sal[row])
+            #         if Nn.size > 0:
+            #             seedling_pos = seedss.seedlings_drift(Nn, residual_is[row],
+            #                                                   model_dfm.get_time_step())
+            #             list_of_seeds.append(seedling_pos)
             
-            seedling_finalpos = pd.concat(list_of_seeds, axis=0)
-            seedling_finalpos['Age'] = datetime.timedelta(days = 0)
+            # seedling_finalpos = pd.concat(list_of_seeds, axis=0)
+            # seedling_finalpos['Age'] = datetime.timedelta(days = 0)
+            # # modify the column name
+            # seedling_finalpos = seedling_finalpos.rename(columns={'seedsPosX':'GeoRefPosX',
+            #                                               'seedsPosY':'GeoRefPosY'})
+            # seedling_finalpos['Created Time Stamp'] = reftime + cursec
+            # seedling_finalpos = seedling_finalpos.reset_index(drop=True)
     
-    # 1.3. Prepare pandas for list of the seedling_finalpos
-    # modify the column name
-    seedling_finalpos = seedling_finalpos.rename(columns={'seedsPosX':'GeoRefPosX',
-                                                  'seedsPosY':'GeoRefPosY'})
-    seedling_finalpos['Created Time Stamp'] = reftime + cursec
-    seedling_finalpos = seedling_finalpos.reset_index(drop=True)
-    
+    # This is occupied for next looping checking
+    current_sec = datetime.timedelta(seconds=model_dfm.get_current_time())
+    # current simulation time multiply by MF
+    current_secMF = current_sec*MorFac
+    # current month based on simulation time (with MF)
+    curyr_check = ((refdatet+current_secMF).strftime('%Y'))
     
     ### 2. convert the water_level from each time_step to each day
     # calculate the x axis of the array of the default run

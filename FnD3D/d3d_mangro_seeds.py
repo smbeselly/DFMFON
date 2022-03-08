@@ -10,6 +10,7 @@ import numpy.ma as ma
 import pandas as pd
 import random
 import math
+import datetime
 
 def index_veg(model_dfm, xyzw_cell_number, xyzw_nodes, xk, yk, read_data):
     index_veg_cel = np.empty((model_dfm.get_var('Cdvegsp').shape[0],0))
@@ -112,9 +113,26 @@ def subsetting_cell(xyzw_cell_number, row, xyzw_nodes, xk, yk, read_data):
     
     return read_data_subset
 
-class mangrove_seedlings():
-    def __init__(self,data_mangrove):
-        self.data_mangrove = data_mangrove
-        
-    def add_age(self, age_in_loop):
-        self.data_mangrove['Age'] = self.data_mangrove['Age']+age_in_loop
+def seedling_dispersal(xyzw_cell_number, index_veg_cel, xyzw_nodes, xk, yk, 
+                       read_data, med_sal, residual_is, model_dfm, reftime, cursec):
+    list_of_seeds = []
+    for row in range(len(xyzw_cell_number)):
+        if index_veg_cel[row] == 1:
+            read_data_subset = subsetting_cell(xyzw_cell_number, row, 
+                                               xyzw_nodes, xk, yk, read_data)  
+            seedss = seedling_establishment(read_data_subset)
+            Nn = seedss.establishment_avicennia(med_sal[row])
+            if Nn.size > 0:
+                seedling_pos = seedss.seedlings_drift(Nn, residual_is[row],
+                                                      model_dfm.get_time_step())
+                list_of_seeds.append(seedling_pos)
+    
+    seedling_finalpos = pd.concat(list_of_seeds, axis=0)
+    seedling_finalpos['Age'] = datetime.timedelta(days = 0)
+    # modify the column name
+    seedling_finalpos = seedling_finalpos.rename(columns={'seedsPosX':'GeoRefPosX',
+                                                  'seedsPosY':'GeoRefPosY'})
+    seedling_finalpos['Created Time Stamp'] = reftime + cursec
+    seedling_finalpos = seedling_finalpos.reset_index(drop=True)
+    
+    return seedling_finalpos

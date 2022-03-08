@@ -370,6 +370,7 @@ def calcAgeCoupling0(read_data, master_trees):
         # age_read_data.append(master_trees['age'][int(index[1])])
 
     age_coupling0 = read_data['tick']+age_read_data
+    age_coupling0 = age_coupling0.reset_index(drop=True)
     
     return age_coupling0
 
@@ -1002,7 +1003,7 @@ def _new_func_createRaster4MesoFON(concave_path,save_tiled_env, no_data_val, EPS
         shutil.copyfile(raster_sal, target_ras_sal0)
         shutil.copyfile(raster_sal, target_ras_sal1)
         
-def newCalcDraginLoop(xyzw_cell_number, xyzw_nodes, xk, yk, read_data, model_dfm):
+def newCalcDraginLoop(xyzw_cell_number, xyzw_nodes, xk, yk, read_data, model_dfm, index_veg_cel):
     Cd_no = 0.005 # assume drag coefficient without the presence of vegetation
     # Parameters of the CPRS and Number of Pneumatophore as in Vovides, et al.,2016
     # a_cprs = 1.45 
@@ -1013,27 +1014,27 @@ def newCalcDraginLoop(xyzw_cell_number, xyzw_nodes, xk, yk, read_data, model_dfm
     f_pneu = 0.3 # const in van Maanen
     D05_pneu = 20 # const in van Maanen
     ## Create an array of vegetated cell
-    index_veg_cel = np.empty((model_dfm.get_var('Cdvegsp').shape[0],0))
-    for row in range(len(xyzw_cell_number)):
-        position = xyzw_cell_number[row,2].astype(int)
+    # index_veg_cel = np.empty((model_dfm.get_var('Cdvegsp').shape[0],0))
+    # for row in range(len(xyzw_cell_number)):
+    #     position = xyzw_cell_number[row,2].astype(int)
         
-        nodes_data = ma.compressed(xyzw_nodes[position][xyzw_nodes[position].mask == False]).astype(int)# select only the valid data (unmasked / false)
-        nodes_pos = np.block([[xk[nodes_data-1]],[yk[nodes_data-1]]]) # substracted to 1 in order to adjust the 0-based position in python
-        # Find the min max of each x,y coordinate
-        # create the list of x_min-x_max and y_min-y_max
-        x_range = [np.min(nodes_pos[0]), np.max(nodes_pos[0])]
-        y_range = [np.min(nodes_pos[1]), np.max(nodes_pos[1])]
+    #     nodes_data = ma.compressed(xyzw_nodes[position][xyzw_nodes[position].mask == False]).astype(int)# select only the valid data (unmasked / false)
+    #     nodes_pos = np.block([[xk[nodes_data-1]],[yk[nodes_data-1]]]) # substracted to 1 in order to adjust the 0-based position in python
+    #     # Find the min max of each x,y coordinate
+    #     # create the list of x_min-x_max and y_min-y_max
+    #     x_range = [np.min(nodes_pos[0]), np.max(nodes_pos[0])]
+    #     y_range = [np.min(nodes_pos[1]), np.max(nodes_pos[1])]
         
-        # subsetting pandas 
-        read_data_subset = read_data[(read_data['GeoRefPosX'] >= x_range[0]) & 
-                                     (read_data['GeoRefPosX'] <= x_range[1])]
-        read_data_subset = read_data_subset[(read_data_subset['GeoRefPosY'] >= y_range[0]) & 
-                                            (read_data_subset['GeoRefPosY'] <= y_range[1])]
-        if read_data_subset.shape[0] == 0: #if 0 then skip
-            index_is = 0
-        else:
-            index_is = 1
-        index_veg_cel = np.append(index_veg_cel, index_is)
+    #     # subsetting pandas 
+    #     read_data_subset = read_data[(read_data['GeoRefPosX'] >= x_range[0]) & 
+    #                                  (read_data['GeoRefPosX'] <= x_range[1])]
+    #     read_data_subset = read_data_subset[(read_data_subset['GeoRefPosY'] >= y_range[0]) & 
+    #                                         (read_data_subset['GeoRefPosY'] <= y_range[1])]
+    #     if read_data_subset.shape[0] == 0: #if 0 then skip
+    #         index_is = 0
+    #     else:
+    #         index_is = 1
+    #     index_veg_cel = np.append(index_veg_cel, index_is)
     # the boundary flow nodes are located at the end of array
     
     ba = model_dfm.get_var('ba') #surface area of the boxes (bottom area) {"location": "face", "shape": ["ndx"]}
