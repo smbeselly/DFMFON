@@ -48,6 +48,7 @@ from d3d_meso_mangro import SalNew_func_createRaster4MesoFON, newCalcDraginLoop
 from d3d_meso_mangro import New_clipSHPcreateXLSfromGPD, SalNew_Sal_func_createRaster4MesoFON
 from d3d_mangro_seeds import index_veg, seedling_establishment
 from d3d_mangro_seeds import seedling_dispersal, calculate_residual, collect_res
+from d3d_mangro_seeds import seedling_prob
 
 os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE" #to prevent error in matplotlib
 
@@ -439,7 +440,11 @@ for ntime in range(int(coupling_ntimeUse)):
         fromheightcalc, Pvaluecalc = calcWOO(h_wl[ii,:],woo_inun) # get correlation of elevation and Probability
         surv_val[ii] = np.interp(med_h_wl[ii],fromheightcalc,Pvaluecalc)
         
-   
+    ## Filter seedlings based on the surv_val
+    seedling_finalpos_2 = seedling_prob(seedling_finalpos, xyzw_cell_number, 
+                                     xyzw_nodes, xk, yk, surv_val)
+    seedling_finalpos = seedling_finalpos_2
+    
     ### 4. Convert from data point to raster environment 
     # 4.1 Create raster from the surv-val
     surv_val_raster = np.column_stack((xz,yz,surv_val))

@@ -11,6 +11,7 @@ import pandas as pd
 import random
 import math
 import datetime
+from numpy.random import default_rng
 
 def index_veg(model_dfm, xyzw_cell_number, xyzw_nodes, xk, yk, read_data):
     index_veg_cel = np.empty((model_dfm.get_var('Cdvegsp').shape[0],0))
@@ -202,7 +203,8 @@ def seedling_dispersal(xyzw_cell_number, index_veg_cel, xyzw_nodes, xk, yk,
                     try:
                         seedling_final_pos = pd.concat(seedling_pos_lists)
                     except ValueError: 
-                        seedling_final_pos = []
+                        seedling_final_pos = pd.DataFrame()
+                        # seedling_final_pos = []
                 else:    
                     pass
                     
@@ -231,7 +233,8 @@ def seedling_dispersal(xyzw_cell_number, index_veg_cel, xyzw_nodes, xk, yk,
         seedling_finalpos['Created Time Stamp'] = reftime + cursec
         seedling_finalpos = seedling_finalpos.reset_index(drop=True)
     except ValueError:
-        seedling_finalpos = []
+        seedling_finalpos = pd.DataFrame()
+        # seedling_finalpos = []
     
     return seedling_finalpos
 
@@ -253,3 +256,45 @@ def collect_res( model_dfm, res_curr_x, res_curr_y):
                             (len(velocity_in_y),1)), axis=1)
     return res_curr_x, res_curr_y
 
+# function to filter the probability of the dispersed seedlings due to WoO
+
+def seedling_prob(sdlg_fnl_pos, xyzw_cell_number,xyzw_nodes, xk, yk, surv_val):
+    list_of_seeds = [] 
+    for row in range(len(xyzw_cell_number)):
+        # print(row) # row yang ada veg adalah 78
+        # div_of_seeds = []
+        # if index_veg_cel[row] == 1:
+            # print (index_veg_cel[row] == 1, row)
+        read_data_subset = subsetting_cell(xyzw_cell_number, row, 
+                                           xyzw_nodes, xk, yk, sdlg_fnl_pos)
+        surv_val_in_row = surv_val[row]
+        
+        if surv_val_in_row < 0.5:
+            num_of_seeds = read_data_subset.copy()
+            div_num_seeds = round(num_of_seeds.shape[0]/2)
+            if div_num_seeds == 0:
+                num_of_seeds = pd.DataFrame()
+            else:
+                size_is = num_of_seeds.shape[0]-div_num_seeds
+                arr_indices_top_drop = default_rng().choice(num_of_seeds.index, size=size_is, replace=False)
+                after_calc = num_of_seeds.drop(index=arr_indices_top_drop)
+                num_of_seeds = after_calc
+        else:
+            num_of_seeds = read_data_subset.copy()
+            # else:
+            #     num_of_seeds = read_data_subset.copy()
+        # try:
+        #     div_of_seeds = pd.concat(num_of_seeds)
+        # except ValueError: 
+        #     div_of_seeds = []
+    
+        try:
+            
+            list_of_seeds.append(num_of_seeds)
+        except:
+            pass
+    
+    seedling_after_woo = pd.concat(list_of_seeds, axis=0)
+    return seedling_after_woo
+            
+    
