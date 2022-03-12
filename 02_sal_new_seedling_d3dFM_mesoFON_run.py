@@ -304,18 +304,11 @@ for ntime in range(int(coupling_ntimeUse)):
         if curmonth == '01' and curyr_check == 0:
             print('prepare for seedlings establishment')
             res_x, res_y = collect_res( model_dfm, res_x, res_y)
-            res_of_x = calculate_residual(res_x, model_dfm.get_time_step(), xz).reshape((len(res_x),1))
-            res_of_y = calculate_residual(res_y, model_dfm.get_time_step(), xz).reshape((len(res_y),1))
-            # create matrix (array)
-            residual_is = np.hstack((res_of_x,res_of_y))     
+                 
         elif curyr_check != 0:
             if curmonth == '01' and curyr != curyr_check:
                 print('prepare for seedlings establishment')
                 res_x, res_y = collect_res( model_dfm, res_x, res_y)
-                res_of_x = calculate_residual(res_x, model_dfm.get_time_step(), xz).reshape((len(res_x),1))
-                res_of_y = calculate_residual(res_y, model_dfm.get_time_step(), xz).reshape((len(res_y),1))
-                # create matrix (array)
-                residual_is = np.hstack((res_of_x,res_of_y))       
             else:
                 print(curyr, '/', curmonth, 'no seedlings establishment')
             
@@ -330,7 +323,11 @@ for ntime in range(int(coupling_ntimeUse)):
         t=t+dts
         print('Coupling ',str(ntime+1), 'run ', t, '/', coupling_period_model)
     
-   
+    res_of_x = calculate_residual(res_x, model_dfm.get_time_step(), xz).reshape((len(res_x),1))
+    res_of_y = calculate_residual(res_y, model_dfm.get_time_step(), xz).reshape((len(res_y),1))
+    # create matrix (array)
+    residual_is = np.hstack((res_of_x,res_of_y))
+    print('calculate residual current in coup;ing',str(ntime+1))
     med_sal = np.median(salinity, axis=1)
     print('Calculate median salinity in coupling',str(ntime+1))
     
