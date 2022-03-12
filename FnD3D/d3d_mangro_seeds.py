@@ -295,6 +295,7 @@ def seedling_prob(sdlg_fnl_pos, xyzw_cell_number,xyzw_nodes, xk, yk, surv_val):
             pass
     
     seedling_after_woo = pd.concat(list_of_seeds, axis=0)
+    seedling_after_woo = seedling_after_woo.reset_index(drop=True)
     return seedling_after_woo
             
     
