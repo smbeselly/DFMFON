@@ -13,12 +13,12 @@ TODO belum nambah script untuk tambahan sediment karena biomass (daun jatuh, dll
 #%% Input Folders and Files
 PROJ_HOME = r'D:\Git\d3d_meso'
 SYS_APP = r'D:\Git\d3d_meso/FnD3D'
-D3D_HOME = r'C:\Program Files (x86)\Deltares\Delft3D Flexible Mesh Suite HMWQ (2021.04)\plugins\DeltaShell.Dimr\kernels\x64'
+D3D_HOME = r'D:\Git\d3d_meso\Model-Execute\D3DFM\oss_artifacts_x64_140691'
 gdal_loc = r'D:\Program_Files\Anaconda3\envs\d3dfm_39\Lib\site-packages\osgeo_utils'
 JAVA_Exe = r'C:\Users\sbe002\RepastSimphony-2.8\eclipse\jdk11\bin\java.exe'
 Mangr_SHP = 'geserMangroveAgeMerged.shp'
 
-D3D_Model = 'FunnelMorphMF30_Adjusted_Saline_geser'
+D3D_Model = 'FunnelMorphMF30_Adjusted_Saline_geser_2'
 D3D_Domain = 'Grid_Funnel_1_net.nc'
 MFON_Folder = 'MesoFON_20220207'
 
