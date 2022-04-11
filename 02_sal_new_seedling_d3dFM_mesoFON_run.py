@@ -443,9 +443,10 @@ for ntime in range(int(coupling_ntimeUse)):
         surv_val[ii] = np.interp(med_h_wl[ii],fromheightcalc,Pvaluecalc)
         
     ## Filter seedlings based on the surv_val
-    seedling_finalpos_2 = seedling_prob(seedling_finalpos, xyzw_cell_number, 
-                                     xyzw_nodes, xk, yk, surv_val)
-    seedling_finalpos = seedling_finalpos_2
+	if seedling_finalpos.size > 0:
+        seedling_finalpos_2 = seedling_prob(seedling_finalpos, xyzw_cell_number, 
+                                         xyzw_nodes, xk, yk, surv_val)
+        seedling_finalpos = seedling_finalpos_2
     
     ### 4. Convert from data point to raster environment 
     # 4.1 Create raster from the surv-val
@@ -531,12 +532,12 @@ for ntime in range(int(coupling_ntimeUse)):
         try:
             send2trash.send2trash(os.path.relpath(os.path.join(filepatt,'instance_1'),PROJ_HOME))
         except OSError as e:
-            print("Error: %s : %s" % (os.path.join(filepatt,'instance_1'), e.strerror))
-            
-        if gpd.read_file(os.path.join(save_tiled_trees,Path(filepatt).stem[:-6]+'.shp')).size > 0:
-            print('calc' , Path(filepatt).stem[:-6])
-            # only calculate MesoFON if trees exist 
-            
+            print("Instance 1 is already deleted before this command: %s : %s" % (os.path.join(filepatt,'instance_1'), e.strerror))
+        # only calculate MesoFON if trees exist 
+        if Path(os.path.join(save_tiled_trees,Path(filepatt).stem[:-12]+'.shp')).is_file():  
+            print(Path(filepatt).stem[:-6])           
+													
+			
             # cd to the directory where MesoFon Exec is located
             os.chdir(filepatt)
             print('Run MesoFON model', Path(filepatt).stem)

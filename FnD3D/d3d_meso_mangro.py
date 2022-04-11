@@ -791,7 +791,7 @@ def d3dNewRaster2Tiles(ras_clip, out_path, tile_size_x, tile_size_y, dir_out):
                 translate_tile = None
             else:
                 # below is to delete the grid with all nodata value
-                del(dss,bands,statss)
+                # del(dss,bands,statss)
                 prep_del = prep_out
                 del(prep_out)
                 os.remove(str(prep_del))
@@ -830,7 +830,7 @@ def Sald3dNewRaster2Tiles(ras_clip, out_path, tile_size_x, tile_size_y, dir_out,
                 translate_tile = None
             else:
                 # below is to delete the grid with all nodata value
-                del(dss,bands,statss)
+                # del(dss,bands,statss)
                 prep_del = prep_out
                 del(prep_out)
                 os.remove(str(prep_del))
@@ -1157,7 +1157,8 @@ def New_clipSHPcreateXLSfromGPD(file_tile, save_tiled_trees, shp_source, species
     
         tree_point = gp_point.clip(gp_clip)
         # tree_point.to_file(save_loc)
-        
+		if tree_point.size > 0:
+            tree_point.to_file(os.path.join(save_tiled_trees, Path(filepath).stem + '.shp')) # save tiled shp trees
         # create the XLS file based on the clipped shp
         posX = tree_point['coord_x']
         posY = tree_point['coord_y']

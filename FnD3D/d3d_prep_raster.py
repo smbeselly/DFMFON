@@ -210,7 +210,13 @@ def d3dRaster2Tiles(out_path, output_filename, ras_clip, tile_size_x, tile_size_
             dss = gdal.Open(prep_out)
             bands = dss.GetRasterBand(1)
             statss = bands.GetStatistics(True,True)
-            if statss[0]!=statss[1]:
+            
+            if statss[0] == 0 and statss[1] == 0:
+                del(dss,bands,statss)
+                prep_del = prep_out
+                del(prep_out)
+                os.remove(str(prep_del))
+            else:
                 #build shapefile
                 if CreateSHP == True:
                     import rasterio as rio
@@ -228,9 +234,99 @@ def d3dRaster2Tiles(out_path, output_filename, ras_clip, tile_size_x, tile_size_
                     # gc.collect()
                 # deleting variables
                 del(dss,bands,statss,prep_out)
-                
-            else:    
-                del(dss,bands,statss)
-                prep_del = prep_out
-                del(prep_out)
-                os.remove(str(prep_del))
+            
+            # if statss[0]!=statss[1]:
+            #     #build shapefile
+            #     if CreateSHP == True:
+            #         import rasterio as rio
+            #         dt = rio.open(prep_out)
+            #         crs_raster= dt.crs
+            #         left,bottom, right, top = dt.bounds #[left, bottom, right, top]
+            #         # Create Shapefile  
+            #         from shapely.geometry import box
+            #         poly_ras= box(left, bottom, right, top) #create poly box
+            #         # plt.plot(*poly_ras.exterior.xy)
+            #         out_poly_namet = str(output_filename) + str(i) + "_" + str(j)
+            #         d3dPolySHP(poly_ras, out_path, out_poly_namet, str(crs_raster)[5:])
+            #         del(dt, crs_raster, left, bottom, right, top, poly_ras)
+            #         # import gc 
+            #         # gc.collect()
+            #     # deleting variables
+            #     del(dss,bands,statss,prep_out)
+			
+			# else:    
+            #     del(dss,bands,statss)
+            #     prep_del = prep_out
+            #     del(prep_out)
+            #     os.remove(str(prep_del))
+
+#%% Tile the raster and filter + retain nodata tiled raster               
+def d3dRaster2TilesRetain(out_path, output_filename, ras_clip, tile_size_x, tile_size_y, CreateSHP=True):
+    """Create tiles of raster tiles of shapefile
+        
+    Parameters
+    ---------
+    out_path = path to save the file
+    output_filename = name of the tiled rasters in string
+    ras_clip = original clipped raster to be tiled
+    tile_size_x = resolution of the tile in x direction in meter
+    tile_size_y = resolution of the tile in y direction in meter
+    CreateSHP = boolean, set True if you want to create SHP, set False for no SHP
+    
+    
+    Returns
+    ---------
+    Tiles of the clipped raster
+    and tiles of shapefile of the clipped raster if CreateSHP=True
+    """
+    ds = gdal.Open(ras_clip)
+    gt = ds.GetGeoTransform()
+    band = ds.GetRasterBand(1)
+    # stats = band.GetStatistics(True,True) # results = min, max, mean, StdDev
+    # stats[1]-stats[0] = max-min
+    xsize = band.XSize
+    ysize = band.YSize
+    # get coordinates of upper left corner
+    # xmin = gt[0]
+    # ymax = gt[3]
+    res = gt[1]
+    
+    # determine total length of raster
+    # xlen = res * ds.RasterXSize # convert the size in meter to number of pixels
+    # ylen = res * ds.RasterYSize
+    
+    # size of a single tile
+    xsize_tile = round(tile_size_x/res) #num of pixels in tile_size_x
+    ysize_tile = round(tile_size_y/res) ##num of pixels in tile_size_y
+    
+    # Tile the raster domain as the prefered tile size in meter
+    for i in range(0, xsize, xsize_tile):
+        for j in range(0, ysize, ysize_tile):
+            prep_out = str(out_path) +str('\\')+ str(output_filename) + str(i) + "_" + str(j) + ".tif"        
+            command = 'gdal_translate -of GTIFF -srcwin {i}, {j}, {xsize_tile}, \
+                {ysize_tile} {prep_conv_out} {prep_out}'
+            os.system(command.format(i=i, j=j, xsize_tile=xsize_tile, ysize_tile=ysize_tile, 
+                                     prep_conv_out=ras_clip, prep_out=prep_out))
+            # below is to filter and delete the grid with all nodata value
+            dss = gdal.Open(prep_out)
+            bands = dss.GetRasterBand(1)
+            statss = bands.GetStatistics(True,True)
+            # if statss[0]!=statss[1]:
+            #build shapefile
+            if CreateSHP == True:
+                import rasterio as rio
+                dt = rio.open(prep_out)
+                crs_raster= dt.crs
+                left,bottom, right, top = dt.bounds #[left, bottom, right, top]
+                # Create Shapefile  
+                from shapely.geometry import box
+                poly_ras= box(left, bottom, right, top) #create poly box
+                # plt.plot(*poly_ras.exterior.xy)
+                out_poly_namet = str(output_filename) + str(i) + "_" + str(j)
+                d3dPolySHP(poly_ras, out_path, out_poly_namet, str(crs_raster)[5:])
+                del(dt, crs_raster, left, bottom, right, top, poly_ras)
+                # import gc 
+                # gc.collect()
+            # deleting variables
+            del(dss,bands,statss,prep_out)					   																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																					
+            
