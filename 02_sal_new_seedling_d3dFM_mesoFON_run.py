@@ -88,7 +88,7 @@ if not os.path.exists(seedlings_out):
     os.makedirs(seedlings_out)
 #%% Settings
 EPSG_Project = 32749 # EPSG code for WGS84/ UTM Zone 49S (Porong case study)
-coupling_period = 30 #days, actually 90 days
+coupling_period = 90 #days, actually 90 days
 MorFac = 30 
 woo_inun = 3 # inundation free period (days)
 species_name = 'Avicennia_marina'
@@ -290,7 +290,7 @@ for ntime in range(int(coupling_ntimeUse)):
     res_x = np.empty((len(xz),0))
     res_y = np.empty((len(xz),0))   
 
-       
+    timeisnow = datetime.datetime.now()   
     t=0 # since the time step in DFM is flexible, therefore use this approach.
     while t<coupling_period_model:
         model_dimr.update()
@@ -311,23 +311,28 @@ for ntime in range(int(coupling_ntimeUse)):
                 res_x, res_y = collect_res( model_dfm, res_x, res_y)
             else:
                 print(curyr, '/', curmonth, 'no seedlings establishment')
-            
-        # calculate the drag coefficient
-        drag_coeff = newCalcDraginLoop(xyzw_cell_number, xyzw_nodes, xk, yk, 
-                                       read_data, model_dfm, index_veg_cel)
-        # drag_coeff = np.append(drag_coeff, addition)*ind 
-        drag_coeff = np.append(drag_coeff, addition)
-        # update the variable with new value
-        model_dfm.set_var('Cdvegsp',drag_coeff)
+        
         dts = model_dfm.get_time_step()
         t=t+dts
+        
+        if t % model_dfm.get_time_step() == 0:
+            # calculate the drag coefficient
+            drag_coeff = newCalcDraginLoop(xyzw_cell_number, xyzw_nodes, xk, yk, 
+                                           read_data, model_dfm, index_veg_cel)
+            # drag_coeff = np.append(drag_coeff, addition)*ind 
+            drag_coeff = np.append(drag_coeff, addition)
+            # update the variable with new value
+            model_dfm.set_var('Cdvegsp',drag_coeff)
+        
         print('Coupling ',str(ntime+1), 'run ', t, '/', coupling_period_model)
+    timeisend = datetime.datetime.now()
+    print('Runtime', 'Coupling ',str(ntime+1), 'is', timeisend-timeisnow)
     
     res_of_x = calculate_residual(res_x, model_dfm.get_time_step(), xz).reshape((len(res_x),1))
     res_of_y = calculate_residual(res_y, model_dfm.get_time_step(), xz).reshape((len(res_y),1))
     # create matrix (array)
     residual_is = np.hstack((res_of_x,res_of_y))
-    print('calculate residual current in coup;ing',str(ntime+1))
+    print('calculate residual current in coupling',str(ntime+1))
     med_sal = np.median(salinity, axis=1)
     print('Calculate median salinity in coupling',str(ntime+1))
     
@@ -527,13 +532,18 @@ for ntime in range(int(coupling_ntimeUse)):
             send2trash.send2trash(os.path.relpath(os.path.join(filepatt,'instance_1'),PROJ_HOME))
         except OSError as e:
             print("Error: %s : %s" % (os.path.join(filepatt,'instance_1'), e.strerror))
-        # cd to the directory where MesoFon Exec is located
-        os.chdir(filepatt)
-        print('Run MesoFON model', Path(filepatt).stem)
-        command_java = '{JAVAREP} -cp lib/* repast.simphony.batch.LocalDriver local_batch_run.properties'
-        os.system(command_java.format(JAVAREP=JAVAREP))
-        # back to the project home
-        os.chdir(PROJ_HOME)
+            
+        if gpd.read_file(os.path.join(save_tiled_trees,Path(filepatt).stem[:-6]+'.shp')).size > 0:
+            print('calc' , Path(filepatt).stem[:-6])
+            # only calculate MesoFON if trees exist 
+            
+            # cd to the directory where MesoFon Exec is located
+            os.chdir(filepatt)
+            print('Run MesoFON model', Path(filepatt).stem)
+            command_java = '{JAVAREP} -cp lib/* repast.simphony.batch.LocalDriver local_batch_run.properties'
+            os.system(command_java.format(JAVAREP=JAVAREP))
+            # back to the project home
+            os.chdir(PROJ_HOME)
 
 
     ### 11. retrieving the results and copy to the MesoFON Model-Out
@@ -547,8 +557,9 @@ for ntime in range(int(coupling_ntimeUse)):
         if not os.path.exists(MFON_OUT_tile):
             os.makedirs(MFON_OUT_tile)
         # select the MFON_Trees only and paste it to the MesoFON_Out
-        shutil.copyfile(nama[0], os.path.join(MFON_OUT_tile,Path(nama[0]).name))
-        namae.append(nama[0])
+        if nama != []:
+            shutil.copyfile(nama[0], os.path.join(MFON_OUT_tile,Path(nama[0]).name))
+            namae.append(nama[0])
 
     ### 12. Compile the results to compile folder
     MFON_OUT_compile = os.path.join(MFON_OUT,'Compile')
@@ -582,31 +593,13 @@ for ntime in range(int(coupling_ntimeUse)):
     ### 13. Read the compile txt file and create the Cd
     read_data = Concat_table  
     
+    timeislast = datetime.datetime.now()
     print('End of coupling',str(ntime+1))
     print('Date now with MF is', ((refdatet+cursecMF).strftime('%Y%m%d %HH:%MM:%SS'))) 
-
+    print('Runtime', 'End of coupling ',str(ntime+1), 'is', timeislast-timeisnow)
     
 ### End Loop
 #Finalize the running
 model_dimr.finalize()   
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 # %%

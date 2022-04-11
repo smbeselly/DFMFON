@@ -206,18 +206,20 @@ for filepath in glob.iglob(file_tile):
 file_tile_trees = os.path.join(save_tiled_trees,'tile_*_trees.shp')
 
 # define d_137 equation for Avicennia : taken from Uwe Grueter's calculation
-a0 = -0.172
-b0 = 49.0713765855412
-a137 = -0.172
-b137 = 48.10139
-# calculate the h137
-d137 = np.arange(0,125.5,0.5)
-d0 = d137
-h137 = a137*d137**2+b137*d137+137
-h0 = a0*d0**2+b0*d0
-# calculate the correlation with interp1d
-f_dbh = interp1d(h137,d137, fill_value="extrapolate")
-f_0 = interp1d(h0,d0)
+# =============================================================================
+# a0 = -0.172
+# b0 = 49.0713765855412
+# a137 = -0.172
+# b137 = 48.10139
+# # calculate the h137
+# d137 = np.arange(0,125.5,0.5)
+# d0 = d137
+# h137 = a137*d137**2+b137*d137+137
+# h0 = a0*d0**2+b0*d0
+# # calculate the correlation with interp1d
+# f_dbh = interp1d(h137,d137, fill_value="extrapolate")
+# f_0 = interp1d(h0,d0)
+# =============================================================================
 
 for filepath in glob.iglob(file_tile_trees): # looping for all with trees affix
     # print(filepath)
@@ -233,7 +235,8 @@ for filepath in glob.iglob(file_tile_trees): # looping for all with trees affix
 
     if height_m.size != 0:
         height_m = height_m.values  # in metre
-        rbh_m = np.where(height_m < 1.37, f_0(height_m*100)/100/2, f_dbh(height_m*100)/100/2)
+        # rbh_m = np.where(height_m < 1.37, f_0(height_m*100)/100/2, f_dbh(height_m*100)/100/2)
+        rbh_m = 0.03/2
     else:
         rbh_m = tile_0_read['height']
 
@@ -404,14 +407,13 @@ for filepatf in glob.iglob(os.path.join(MFON_Exchange,'Initialization','tile_*.t
 #%% Use os.system(command) to call Java from Python    
 
 for filepatt in glob.iglob(os.path.join(MFON_HOME, 'tile_*')):
-    try:
-        send2trash.send2trash(os.path.join(filepatt,'instance_1'))
-    except OSError as e:
-        print("Instance 1 is already deleted before this command: %s : %s" % (os.path.join(filepatt,'instance_1'), e.strerror))
-        
     if gpd.read_file(os.path.join(save_tiled_trees,Path(filepatt).stem[:-6]+'.shp')).size > 0:
     # only calculate MesoFON if trees exist 
         # delete the existing instance1 in in the folder to prevent symlink errorp prior running
+        try:
+            send2trash.send2trash(os.path.join(filepatt,'instance_1'))
+        except OSError as e:
+            print("Instance 1 is already deleted before this command: %s : %s" % (os.path.join(filepatt,'instance_1'), e.strerror))
         
         # cd to the directory where MesoFon Exec is located
         os.chdir(filepatt)
@@ -433,8 +435,9 @@ for filepatg in glob.iglob(os.path.join(MFON_HOME, 'tile_*')):
     if not os.path.exists(MFON_OUT_tile):
         os.makedirs(MFON_OUT_tile)
     # select the MFON_Trees only and paste it to the MesoFON_Out
-    shutil.copyfile(nama[0], os.path.join(MFON_OUT_tile,Path(nama[0]).name))
-    namae.append(nama[0])
+    if nama != []:
+        shutil.copyfile(nama[0], os.path.join(MFON_OUT_tile,Path(nama[0]).name))
+        namae.append(nama[0])
 
 ### Compile the results to compile folder
 MFON_OUT_compile = os.path.join(MFON_OUT,'Compile')
