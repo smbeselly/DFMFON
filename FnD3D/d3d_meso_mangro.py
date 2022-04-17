@@ -1002,8 +1002,37 @@ def _new_func_createRaster4MesoFON(concave_path,save_tiled_env, no_data_val, EPS
         # do the copy-paste
         shutil.copyfile(raster_sal, target_ras_sal0)
         shutil.copyfile(raster_sal, target_ras_sal1)
+
+### buat list untuk read data subset
+def list_subset(xyzw_cell_number, index_veg_cel, xyzw_nodes, xk, yk, read_data):
+    # this function is to predefine the subset before calculate drag
         
-def newCalcDraginLoop(xyzw_cell_number, xyzw_nodes, xk, yk, read_data, model_dfm, index_veg_cel):
+    list_read_subset = []
+    for row in range(len(xyzw_cell_number)):
+        if index_veg_cel[row] == 0:
+            read_data_subset = np.nan
+        else:
+            position = xyzw_cell_number[row,2].astype(int)
+            
+            nodes_data = ma.compressed(xyzw_nodes[position][xyzw_nodes[position].mask == False]).astype(int)# select only the valid data (unmasked / false)
+            nodes_pos = np.block([[xk[nodes_data-1]],[yk[nodes_data-1]]]) # substracted to 1 in order to adjust the 0-based position in python
+            # Find the min max of each x,y coordinate
+            # create the list of x_min-x_max and y_min-y_max
+            x_range = [np.min(nodes_pos[0]), np.max(nodes_pos[0])]
+            y_range = [np.min(nodes_pos[1]), np.max(nodes_pos[1])]
+            
+            # subsetting pandas 
+            read_data_subset = read_data[(read_data['GeoRefPosX'] >= x_range[0]) & 
+                                         (read_data['GeoRefPosX'] <= x_range[1])]
+            read_data_subset = read_data_subset[(read_data_subset['GeoRefPosY'] >= y_range[0]) & 
+                                                (read_data_subset['GeoRefPosY'] <= y_range[1])]
+        
+        list_read_subset.append(read_data_subset)
+        
+        return list_read_subset
+
+### drag predictor formula
+def newCalcDraginLoop(xyzw_cell_number, xyzw_nodes, xk, yk, read_data, model_dfm, index_veg_cel, list_read_subset):
     Cd_no = 0.005 # assume drag coefficient without the presence of vegetation
     # Parameters of the CPRS and Number of Pneumatophore as in Vovides, et al.,2016
     # a_cprs = 1.45 
@@ -1057,20 +1086,24 @@ def newCalcDraginLoop(xyzw_cell_number, xyzw_nodes, xk, yk, read_data, model_dfm
             else:
                 # print(row)
                # find the position based on the cell number
-                position = xyzw_cell_number[row,2].astype(int)
+# =============================================================================
+#                 position = xyzw_cell_number[row,2].astype(int)
+#                 
+#                 nodes_data = ma.compressed(xyzw_nodes[position][xyzw_nodes[position].mask == False]).astype(int)# select only the valid data (unmasked / false)
+#                 nodes_pos = np.block([[xk[nodes_data-1]],[yk[nodes_data-1]]]) # substracted to 1 in order to adjust the 0-based position in python
+#                 # Find the min max of each x,y coordinate
+#                 # create the list of x_min-x_max and y_min-y_max
+#                 x_range = [np.min(nodes_pos[0]), np.max(nodes_pos[0])]
+#                 y_range = [np.min(nodes_pos[1]), np.max(nodes_pos[1])]
+#                 
+#                 # subsetting pandas 
+#                 read_data_subset = read_data[(read_data['GeoRefPosX'] >= x_range[0]) & 
+#                                              (read_data['GeoRefPosX'] <= x_range[1])]
+#                 read_data_subset = read_data_subset[(read_data_subset['GeoRefPosY'] >= y_range[0]) & 
+#                                                     (read_data_subset['GeoRefPosY'] <= y_range[1])]
+# =============================================================================
                 
-                nodes_data = ma.compressed(xyzw_nodes[position][xyzw_nodes[position].mask == False]).astype(int)# select only the valid data (unmasked / false)
-                nodes_pos = np.block([[xk[nodes_data-1]],[yk[nodes_data-1]]]) # substracted to 1 in order to adjust the 0-based position in python
-                # Find the min max of each x,y coordinate
-                # create the list of x_min-x_max and y_min-y_max
-                x_range = [np.min(nodes_pos[0]), np.max(nodes_pos[0])]
-                y_range = [np.min(nodes_pos[1]), np.max(nodes_pos[1])]
-                
-                # subsetting pandas 
-                read_data_subset = read_data[(read_data['GeoRefPosX'] >= x_range[0]) & 
-                                             (read_data['GeoRefPosX'] <= x_range[1])]
-                read_data_subset = read_data_subset[(read_data_subset['GeoRefPosY'] >= y_range[0]) & 
-                                                    (read_data_subset['GeoRefPosY'] <= y_range[1])]
+                read_data_subset = list_read_subset[row]
                 
     
                 # calculate the drag coefficient (currently only for Avicennia marina)
@@ -1157,7 +1190,7 @@ def New_clipSHPcreateXLSfromGPD(file_tile, save_tiled_trees, shp_source, species
     
         tree_point = gp_point.clip(gp_clip)
         # tree_point.to_file(save_loc)
-		if tree_point.size > 0:
+        if tree_point.size > 0:
             tree_point.to_file(os.path.join(save_tiled_trees, Path(filepath).stem + '.shp')) # save tiled shp trees
         # create the XLS file based on the clipped shp
         posX = tree_point['coord_x']

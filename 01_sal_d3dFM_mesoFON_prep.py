@@ -45,6 +45,8 @@ plt.close('all')
 
 import glob
 # from osgeo import ogr
+# Supress/hide the warning
+np.seterr(invalid='ignore')
 
 import geopandas as gpd
 import pandas as pd
@@ -436,7 +438,7 @@ for filepatg in glob.iglob(os.path.join(MFON_HOME, 'tile_*')):
         os.makedirs(MFON_OUT_tile)
     # select the MFON_Trees only and paste it to the MesoFON_Out
     if nama != []:
-        shutil.copyfile(nama[0], os.path.join(MFON_OUT_tile,Path(nama[0]).name))
+        shutil.copyfile(nama[0], os.path.join(MFON_OUT_tile,Path(nama[0]).stem + ' Coupling_0.txt'))
         namae.append(nama[0])
 
 ### Compile the results to compile folder

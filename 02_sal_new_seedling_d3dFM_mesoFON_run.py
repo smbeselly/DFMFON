@@ -36,6 +36,8 @@ faulthandler.enable()
 import sys
 # print(sys.path)
 sys.path.append(SYS_APP) # as this Func will be in the same folder, no longer needed
+# Supress/hide the warning
+np.seterr(invalid='ignore')
 
 from dfm_tools.get_nc import get_ncmodeldata
 # from dfm_tools.io.polygon import Polygon
@@ -46,6 +48,7 @@ from d3d_meso_mangro import modifyParamMesoFON #, createRaster4MesoFON, calcDrag
 from d3d_meso_mangro import csv2ClippedRaster, Sald3dNewRaster2Tiles #, clipSHPcreateXLSfromGPD
 from d3d_meso_mangro import SalNew_func_createRaster4MesoFON, newCalcDraginLoop
 from d3d_meso_mangro import New_clipSHPcreateXLSfromGPD, SalNew_Sal_func_createRaster4MesoFON
+from d3d_meso_mangro import list_subset
 from d3d_mangro_seeds import index_veg, seedling_establishment
 from d3d_mangro_seeds import seedling_dispersal, calculate_residual, collect_res
 from d3d_mangro_seeds import seedling_prob
@@ -233,6 +236,8 @@ for ntime in range(int(coupling_ntimeUse)):
     
     # find cells that have vegetation
     index_veg_cel = index_veg(model_dfm, xyzw_cell_number, xyzw_nodes, xk, yk, read_data)
+    # predefine the pandas dataframe of the mangrove positions
+    list_read_subset = list_subset(xyzw_cell_number, index_veg_cel, xyzw_nodes, xk, yk, read_data)
         
     try:
         list_seed2sapl.append(seedling_finalpos)
@@ -318,7 +323,8 @@ for ntime in range(int(coupling_ntimeUse)):
         if t % model_dfm.get_time_step() == 0:
             # calculate the drag coefficient
             drag_coeff = newCalcDraginLoop(xyzw_cell_number, xyzw_nodes, xk, yk, 
-                                           read_data, model_dfm, index_veg_cel)
+                                           read_data, model_dfm, index_veg_cel,
+                                           list_read_subset)
             # drag_coeff = np.append(drag_coeff, addition)*ind 
             drag_coeff = np.append(drag_coeff, addition)
             # update the variable with new value
@@ -443,7 +449,7 @@ for ntime in range(int(coupling_ntimeUse)):
         surv_val[ii] = np.interp(med_h_wl[ii],fromheightcalc,Pvaluecalc)
         
     ## Filter seedlings based on the surv_val
-	if seedling_finalpos.size > 0:
+    if seedling_finalpos.size > 0:
         seedling_finalpos_2 = seedling_prob(seedling_finalpos, xyzw_cell_number, 
                                          xyzw_nodes, xk, yk, surv_val)
         seedling_finalpos = seedling_finalpos_2
@@ -537,7 +543,6 @@ for ntime in range(int(coupling_ntimeUse)):
         if Path(os.path.join(save_tiled_trees,Path(filepatt).stem[:-12]+'.shp')).is_file():  
             print(Path(filepatt).stem[:-6])           
 													
-			
             # cd to the directory where MesoFon Exec is located
             os.chdir(filepatt)
             print('Run MesoFON model', Path(filepatt).stem)
@@ -559,7 +564,7 @@ for ntime in range(int(coupling_ntimeUse)):
             os.makedirs(MFON_OUT_tile)
         # select the MFON_Trees only and paste it to the MesoFON_Out
         if nama != []:
-            shutil.copyfile(nama[0], os.path.join(MFON_OUT_tile,Path(nama[0]).name))
+            shutil.copyfile(nama[0], os.path.join(MFON_OUT_tile,Path(nama[0]).stem +' Coupling_'+str(ntime+1)+'.txt'))
             namae.append(nama[0])
 
     ### 12. Compile the results to compile folder
