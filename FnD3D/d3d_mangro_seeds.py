@@ -57,8 +57,13 @@ class seedling_establishment():
         D = 0.03 # in R. apiculata D=0.006 (Grueters, et.al., 2014)
         f_sal_red = 1/(1+np.exp(d*(ui-salinity_value)))
         # self.data_mangrove['Species'] = self.data_mangrove['Species'].astype('str')
-        avicennia_only = self.data_mangrove[(self.data_mangrove['Species'].str.contains("Avicennia_marina")) & 
-                                            (self.data_mangrove['Age'] >= 4)]        
+        # it is better to directly calculate seedlings productions based on crown surface
+        # not limited to age, as it is difficult to measure age on field
+        # mostly via dbh as a proxy
+        # avicennia_only = self.data_mangrove[(self.data_mangrove['Species'].str.contains("Avicennia_marina")) & 
+        #                                     (self.data_mangrove['Age'] >= 4)]
+        avicennia_only = self.data_mangrove[(self.data_mangrove['Species'].str.contains("Avicennia_marina"))] 
+        
         N = round(f_sal_red*D*avicennia_only['CrownSurfaceArea_m2'])
         N.rename('N seedlings', inplace=True)
         N_seed = pd.merge(N,avicennia_only, left_index=True, right_index=True)
