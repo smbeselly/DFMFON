@@ -733,13 +733,23 @@ def csv2ClippedRaster(concave_path, surv_val_raster, concave_name, x_res, y_res,
              '</OGRVRTDataSource>']
     with open(str(concave_path)+str('\\')+str(concave_name)+'.vrt', 'w') as f:
         f.write('\n'.join(lines))
-    
-    x_min = np.min(surv_val_raster[:,0])
-    x_max = np.max(surv_val_raster[:,0])
-    y_min = np.min(surv_val_raster[:,1])
-    y_max = np.max(surv_val_raster[:,1])
-    x_width = (x_max-x_min)/x_res
-    y_height = (y_max-y_min)/y_res
+     
+    # x_min = np.min(surv_val_raster[:,0])
+    # x_max = np.max(surv_val_raster[:,0])
+    # y_min = np.min(surv_val_raster[:,1])
+    # y_max = np.max(surv_val_raster[:,1])
+    # x_width = (x_max-x_min)/x_res
+    # y_height = (y_max-y_min)/y_res
+    template = os.path.join(dir_out,'CH_bathy__clipped.tif')
+    ds = gdal.Open(template)
+    gt = ds.GetGeoTransform()
+    res = gt[1]
+    x_width = ds.RasterXSize
+    y_height = ds.RasterYSize
+    x_min =  gt[0]
+    x_max =  x_min + res* x_width
+    y_min = gt[3]
+    y_max = y_min + gt[5] * y_height
 
     lin_raster = gdal.Grid(os.path.join(concave_path,concave_name+'.tif'), 
                             os.path.join(concave_path,concave_name+'.vrt'),
@@ -1029,9 +1039,128 @@ def list_subset(xyzw_cell_number, index_veg_cel, xyzw_nodes, xk, yk, read_data):
         
         list_read_subset.append(read_data_subset)
         
-        return list_read_subset
+    return list_read_subset
 
 ### drag predictor formula
+def initCalcDraginLoop(xyzw_cell_number, xyzw_nodes, xk, yk, read_data, model_dfm, index_veg_cel):
+    Cd_no = 0.005 # assume drag coefficient without the presence of vegetation
+    # Parameters of the CPRS and Number of Pneumatophore as in Vovides, et al.,2016
+    # a_cprs = 1.45 
+    # b_cprs = 8.97
+    # N Pneumatophore as in van Maanen 
+    d_pneu = 0.01 # m
+    h_pneu = 0.15 # m
+    f_pneu = 0.3 # const in van Maanen
+    D05_pneu = 20 # const in van Maanen
+    ## Create an array of vegetated cell
+    # index_veg_cel = np.empty((model_dfm.get_var('Cdvegsp').shape[0],0))
+    # for row in range(len(xyzw_cell_number)):
+    #     position = xyzw_cell_number[row,2].astype(int)
+        
+    #     nodes_data = ma.compressed(xyzw_nodes[position][xyzw_nodes[position].mask == False]).astype(int)# select only the valid data (unmasked / false)
+    #     nodes_pos = np.block([[xk[nodes_data-1]],[yk[nodes_data-1]]]) # substracted to 1 in order to adjust the 0-based position in python
+    #     # Find the min max of each x,y coordinate
+    #     # create the list of x_min-x_max and y_min-y_max
+    #     x_range = [np.min(nodes_pos[0]), np.max(nodes_pos[0])]
+    #     y_range = [np.min(nodes_pos[1]), np.max(nodes_pos[1])]
+        
+    #     # subsetting pandas 
+    #     read_data_subset = read_data[(read_data['GeoRefPosX'] >= x_range[0]) & 
+    #                                  (read_data['GeoRefPosX'] <= x_range[1])]
+    #     read_data_subset = read_data_subset[(read_data_subset['GeoRefPosY'] >= y_range[0]) & 
+    #                                         (read_data_subset['GeoRefPosY'] <= y_range[1])]
+    #     if read_data_subset.shape[0] == 0: #if 0 then skip
+    #         index_is = 0
+    #     else:
+    #         index_is = 1
+    #     index_veg_cel = np.append(index_veg_cel, index_is)
+    # the boundary flow nodes are located at the end of array
+    
+    ba = model_dfm.get_var('ba') #surface area of the boxes (bottom area) {"location": "face", "shape": ["ndx"]}
+    hs = model_dfm.get_var('hs') #water depth at the end of timestep {"location": "face", "shape": ["ndx"]}
+    
+    drag_coeff = np.empty((model_dfm.get_var('Cdvegsp').shape[0],0))
+    for row in range(len(xyzw_cell_number)):
+        if index_veg_cel[row] == 0:
+            Cd_calc_bare = 0.005
+            drag_coeff = np.append(drag_coeff, Cd_calc_bare)
+        else:
+            # calculate cell_area and water_depth
+            cell_area = ba[row] # sudah sesuai karena boundary ada di array paling akhir
+            water_depth = hs[row]# sama seperti di atas
+            # sometimes there is a condition where the cell is dry
+            # therefore, if it is dry I set the drag as Cd_no
+            if water_depth == 0:
+                Cd_calc_bare = 0.005
+                drag_coeff = np.append(drag_coeff, Cd_calc_bare)
+            else:
+                # print(row)
+                # find the position based on the cell number
+                position = xyzw_cell_number[row,2].astype(int)
+                
+                nodes_data = ma.compressed(xyzw_nodes[position][xyzw_nodes[position].mask == False]).astype(int)# select only the valid data (unmasked / false)
+                nodes_pos = np.block([[xk[nodes_data-1]],[yk[nodes_data-1]]]) # substracted to 1 in order to adjust the 0-based position in python
+                # Find the min max of each x,y coordinate
+                # create the list of x_min-x_max and y_min-y_max
+                x_range = [np.min(nodes_pos[0]), np.max(nodes_pos[0])]
+                y_range = [np.min(nodes_pos[1]), np.max(nodes_pos[1])]
+                
+                # subsetting pandas 
+                read_data_subset = read_data[(read_data['GeoRefPosX'] >= x_range[0]) & 
+                                             (read_data['GeoRefPosX'] <= x_range[1])]
+                read_data_subset = read_data_subset[(read_data_subset['GeoRefPosY'] >= y_range[0]) & 
+                                                    (read_data_subset['GeoRefPosY'] <= y_range[1])]
+               
+                # calculate the drag coefficient (currently only for Avicennia marina)
+                # cd_veg = calcDragCoeff(x_range, y_range, cell_area, water_depth, trees_data)
+            
+                # Calculate the CPRS and Number of Pneumatophore
+                # Define the boundary (CPRS) as in Vovides, et al.,2016          
+                # cprs_avicennia = (a_cprs*read_data_subset['dbh_cm'])/(b_cprs+read_data_subset['dbh_cm']) #results in meter
+            
+                # Volume of the aerial roots
+                N_pneu = 10025*(1/(1+np.exp(f_pneu*(D05_pneu-read_data_subset['dbh_cm']))))
+                          
+                # if function to adjust the h_pneu for Avicennia
+                # this equation is from Du, Qin, et al. 2021
+                if water_depth < h_pneu:
+                    Vm_pneu = np.pi*d_pneu*water_depth/12
+                else:
+                    Vm_pneu = np.pi*d_pneu*h_pneu/12
+            
+                Vm_pneu_total = Vm_pneu*N_pneu #m^3
+                Am_pneu_total = d_pneu*h_pneu*N_pneu #m^2
+            
+                # Calculate the d_0 from height of the tree, wait for Uwe Grueter Confirmation
+                # height is adjusted from the water depth
+                Vm_trunk = np.pi/4*(read_data_subset['dbh_cm']/100)**2*water_depth #m^3 
+                Am_trunk = (read_data_subset['dbh_cm']/100)*water_depth #m^3 
+            
+                # sum of the obstacle volume
+                Vm = Vm_pneu_total + Vm_trunk #m^3
+                # sum of the obstacle area
+                Am = Am_pneu_total + Am_trunk#m^2
+            
+                # Volume of the control water
+            
+                V = cell_area*water_depth
+            
+                # Characteristic Length (m)
+                L = (V-Vm)/Am
+                # Cd_no = 0.005 # assume drag coefficient without the presence of vegetation
+                e_drag = 5 # set to 5m to obtain realistic value for Cd
+            
+                Cd_calc = (Cd_no + (e_drag/L)).sum()
+                # TODO this is just for reminder of the commented script
+                # is it really needed to calculate the weighted drag?
+                # Cd_calc_weighted = Cd_calc*(Vm.sum()/V) + Cd_no * ((V-Vm.sum())/V)
+                
+                # append the calculated cd_veg to the drag_coeff list
+                # drag_coeff.append(cd_veg)
+                drag_coeff = np.append(drag_coeff, Cd_calc)
+        
+    return drag_coeff
+
 def newCalcDraginLoop(xyzw_cell_number, xyzw_nodes, xk, yk, read_data, model_dfm, index_veg_cel, list_read_subset):
     Cd_no = 0.005 # assume drag coefficient without the presence of vegetation
     # Parameters of the CPRS and Number of Pneumatophore as in Vovides, et al.,2016
