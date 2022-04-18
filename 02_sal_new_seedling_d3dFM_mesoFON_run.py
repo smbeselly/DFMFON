@@ -48,7 +48,7 @@ from d3d_meso_mangro import modifyParamMesoFON #, createRaster4MesoFON, calcDrag
 from d3d_meso_mangro import csv2ClippedRaster, Sald3dNewRaster2Tiles #, clipSHPcreateXLSfromGPD
 from d3d_meso_mangro import SalNew_func_createRaster4MesoFON, newCalcDraginLoop
 from d3d_meso_mangro import New_clipSHPcreateXLSfromGPD, SalNew_Sal_func_createRaster4MesoFON
-from d3d_meso_mangro import list_subset
+from d3d_meso_mangro import initCalcDraginLoop, list_subset
 from d3d_mangro_seeds import index_veg, seedling_establishment
 from d3d_mangro_seeds import seedling_dispersal, calculate_residual, collect_res
 from d3d_mangro_seeds import seedling_prob
@@ -184,7 +184,7 @@ age_coupling = read_data['Age']
 
 # For loop for all of the cell number
 index_veg_cel = index_veg(model_dfm, xyzw_cell_number, xyzw_nodes, xk, yk, read_data)
-drag_coeff = newCalcDraginLoop(xyzw_cell_number, xyzw_nodes, xk, yk, 
+drag_coeff = initCalcDraginLoop(xyzw_cell_number, xyzw_nodes, xk, yk, 
                                read_data, model_dfm, index_veg_cel)
 # assume that the boundary flow nodes are located at the end of array
 addition = np.zeros((model_dfm.get_var('ndx')-model_dfm.get_var('ndxi'))) + 0.005  
@@ -331,21 +331,34 @@ for ntime in range(int(coupling_ntimeUse)):
             model_dfm.set_var('Cdvegsp',drag_coeff)
         
         print('Coupling ',str(ntime+1), 'run ', t, '/', coupling_period_model)
+
+        cursec = datetime.timedelta(seconds=model_dfm.get_current_time()) #https://stackoverflow.com/questions/775049/how-do-i-convert-seconds-to-hours-minutes-and-seconds
+        # current simulation time multiply by MF
+        cursecMF = cursec*MorFac
+        # current month based on simulation time (with MF)
+        curyr = ((refdatet+cursecMF).strftime('%Y'))
+        curmonth = ((refdatet+cursecMF).strftime('%m'))
+        print('simulation date with MF is', ((refdatet+cursecMF).strftime('%Y%m%d %HH:%MM:%SS'))) 
+      
     timeisend = datetime.datetime.now()
     print('Runtime', 'Coupling ',str(ntime+1), 'is', timeisend-timeisnow)
+    curyr_check = curyr
     
-    res_of_x = calculate_residual(res_x, model_dfm.get_time_step(), xz).reshape((len(res_x),1))
-    res_of_y = calculate_residual(res_y, model_dfm.get_time_step(), xz).reshape((len(res_y),1))
-    # create matrix (array)
-    residual_is = np.hstack((res_of_x,res_of_y))
-    print('calculate residual current in coupling',str(ntime+1))
+    if res_x.size != 0 :
+        res_of_x = calculate_residual(res_x, model_dfm.get_time_step(), xz).reshape((len(res_x),1))
+        res_of_y = calculate_residual(res_y, model_dfm.get_time_step(), xz).reshape((len(res_y),1))
+        # create matrix (array)
+        residual_is = np.hstack((res_of_x,res_of_y))
+        print('calculate residual current in coupling',str(ntime+1))
+    else:
+        residual_is = []
     med_sal = np.median(salinity, axis=1)
     print('Calculate median salinity in coupling',str(ntime+1))
     
     # 1.3. Prepare pandas for list of the seedling_finalpos
     
     # check condition
-    if curmonth == '01' and curyr_check == 0:
+    if len(residual_is) != 0:
         print('calculate seedlings position for year', curyr )
         seedling_finalpos = seedling_dispersal(xyzw_cell_number, index_veg_cel, 
                                                xyzw_nodes, xk, yk, read_data, 
@@ -358,35 +371,10 @@ for ntime in range(int(coupling_ntimeUse)):
         seedling_finalpos.to_csv(os.path.join(seedlings_out, 
                                 'Seedling_Coupling_'+str(ntime+1)+'.txt'), 
                                  sep=',', index=False, header=True)
-        # This is occupied for next looping checking
-        current_sec = datetime.timedelta(seconds=model_dfm.get_current_time())
-        # current simulation time multiply by MF
-        current_secMF = current_sec*MorFac
-        # current month based on simulation time (with MF)
-        curyr_check = ((refdatet+current_secMF).strftime('%Y'))
 
-    elif curyr_check != 0:
-        if curmonth == '01' and curyr != curyr_check:
-            print('calculate seedlings position for year', curyr )
-            seedling_finalpos = seedling_dispersal(xyzw_cell_number, index_veg_cel, 
-                                                   xyzw_nodes, xk, yk, read_data, 
-                                                   med_sal, residual_is, model_dfm, 
-                                                   reftime, cursec)
-            # check seedlngs duplicate: https://www.machinelearningplus.com/pandas/pandas-duplicated/
-            bool_series = seedling_finalpos.duplicated(keep='first')
-            seedling_finalpos = seedling_finalpos[~bool_series]
-            
-            seedling_finalpos.to_csv(os.path.join(seedlings_out, 
-                                    'Seedling_Coupling_'+str(ntime+1)+'.txt'), 
-                                     sep=',', index=False, header=True)
-            # This is occupied for next looping checking
-            current_sec = datetime.timedelta(seconds=model_dfm.get_current_time())
-            # current simulation time multiply by MF
-            current_secMF = current_sec*MorFac
-            # current month based on simulation time (with MF)
-            curyr_check = ((refdatet+current_secMF).strftime('%Y'))
-        else:
-            print(curyr, '/', curmonth, 'no seedlings establishment')
+    else:
+        print(curyr, '/', curmonth, 'no seedlings establishment')
+    
     
     
     
@@ -534,14 +522,21 @@ for ntime in range(int(coupling_ntimeUse)):
     
     ### 10. Run the MesoFON
     for filepatt in glob.iglob(os.path.join(MFON_HOME, 'tile_*')):
-        # delete the existing instance1 in in the folder to prevent symlink errorp prior running
-        try:
-            send2trash.send2trash(os.path.relpath(os.path.join(filepatt,'instance_1'),PROJ_HOME))
-        except OSError as e:
-            print("Instance 1 is already deleted before this command: %s : %s" % (os.path.join(filepatt,'instance_1'), e.strerror))
         # only calculate MesoFON if trees exist 
         if Path(os.path.join(save_tiled_trees,Path(filepatt).stem[:-12]+'.shp')).is_file():  
-            print(Path(filepatt).stem[:-6])           
+            print(Path(filepatt).stem[:-6])    
+            
+            # delete the existing instance1 in in the folder to prevent symlink errorp prior running
+            try:
+                # send2trash.send2trash(os.path.relpath(os.path.join(filepatt,'instance_1'),PROJ_HOME))
+                directory = os.path.join(filepatt,'instance_1')
+                files_in_directory = os.listdir(directory)
+                filtered_files = [file for file in files_in_directory if file.startswith("MF")]
+                for file in filtered_files:
+                    path_to_file = os.path.join(directory, file)
+                    send2trash.send2trash(path_to_file)
+            except OSError as e:
+                print("Instance 1 is already deleted before this command: %s : %s" % (os.path.join(filepatt,'instance_1'), e.strerror))
 													
             # cd to the directory where MesoFon Exec is located
             os.chdir(filepatt)
