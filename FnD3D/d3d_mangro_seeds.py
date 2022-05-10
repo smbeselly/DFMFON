@@ -42,7 +42,7 @@ class seedling_establishment():
     def __init__(self,data_mangrove):
         self.data_mangrove = data_mangrove
         
-    def reduction_nutrient_avicenniamarina(self):
+    def reduction_nutrient_avicenniamarina(self): ## tidak digunakan saat ini
         c1 = -0.5
         c2 = 2.88
         c3 = -1.66
@@ -54,7 +54,8 @@ class seedling_establishment():
     def establishment_avicennia(self, salinity_value):
         d = -0.18
         ui = 72
-        D = 0.03 # in R. apiculata D=0.006 (Grueters, et.al., 2014)
+        D = 0.03 # in R. apiculata D=0.006 (Grueters, et.al., 2014), another set: 0.03
+        # from Schile, Lisa M., et al. 2017, seed reproduction is 1.076 per 1m^2 crown area
         f_sal_red = 1/(1+np.exp(d*(ui-salinity_value)))
         # self.data_mangrove['Species'] = self.data_mangrove['Species'].astype('str')
         # it is better to directly calculate seedlings productions based on crown surface
@@ -274,7 +275,17 @@ def seedling_prob(sdlg_fnl_pos, xyzw_cell_number,xyzw_nodes, xk, yk, surv_val):
                                            xyzw_nodes, xk, yk, sdlg_fnl_pos)
         surv_val_in_row = surv_val[row]
         
-        if surv_val_in_row < 0.5:
+        if surv_val_in_row <= 0.3:
+            num_of_seeds = read_data_subset.copy()
+            div_num_seeds = round(num_of_seeds.shape[0]/1.5)
+            if div_num_seeds == 0:
+                num_of_seeds = pd.DataFrame()
+            else:
+                size_is = num_of_seeds.shape[0]-div_num_seeds
+                arr_indices_top_drop = default_rng().choice(num_of_seeds.index, size=size_is, replace=False)
+                after_calc = num_of_seeds.drop(index=arr_indices_top_drop)
+                num_of_seeds = after_calc
+        elif surv_val_in_row <= 0.5:
             num_of_seeds = read_data_subset.copy()
             div_num_seeds = round(num_of_seeds.shape[0]/2)
             if div_num_seeds == 0:
@@ -284,14 +295,18 @@ def seedling_prob(sdlg_fnl_pos, xyzw_cell_number,xyzw_nodes, xk, yk, surv_val):
                 arr_indices_top_drop = default_rng().choice(num_of_seeds.index, size=size_is, replace=False)
                 after_calc = num_of_seeds.drop(index=arr_indices_top_drop)
                 num_of_seeds = after_calc
+        elif surv_val_in_row <= 0.7:
+            num_of_seeds = read_data_subset.copy()
+            div_num_seeds = round(num_of_seeds.shape[0]/3)
+            if div_num_seeds == 0:
+                num_of_seeds = pd.DataFrame()
+            else:
+                size_is = num_of_seeds.shape[0]-div_num_seeds
+                arr_indices_top_drop = default_rng().choice(num_of_seeds.index, size=size_is, replace=False)
+                after_calc = num_of_seeds.drop(index=arr_indices_top_drop)
+                num_of_seeds = after_calc
         else:
             num_of_seeds = read_data_subset.copy()
-            # else:
-            #     num_of_seeds = read_data_subset.copy()
-        # try:
-        #     div_of_seeds = pd.concat(num_of_seeds)
-        # except ValueError: 
-        #     div_of_seeds = []
     
         try:
             

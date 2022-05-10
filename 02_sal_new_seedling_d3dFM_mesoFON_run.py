@@ -391,8 +391,6 @@ for ntime in range(int(coupling_ntimeUse)):
         print(curyr, '/', curmonth, 'no seedlings establishment')
     
     
-    
-    
     ### 2. convert the water_level from each time_step to each day
     # calculate the x axis of the array of the default run
     wl_shape = water_level.shape
