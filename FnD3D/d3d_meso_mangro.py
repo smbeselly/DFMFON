@@ -1161,7 +1161,7 @@ def initCalcDraginLoop(xyzw_cell_number, xyzw_nodes, xk, yk, read_data, model_df
         
     return drag_coeff
 
-def newCalcDraginLoop(xyzw_cell_number, xyzw_nodes, xk, yk, read_data, model_dfm, index_veg_cel, list_read_subset):
+def newCalcDraginLoop(xyzw_cell_number, read_data, model_dfm, index_veg_cel, list_read_subset):
     Cd_no = 0.005 # assume drag coefficient without the presence of vegetation
     # Parameters of the CPRS and Number of Pneumatophore as in Vovides, et al.,2016
     # a_cprs = 1.45 
@@ -1417,4 +1417,40 @@ def SalNew_Sal_func_createRaster4MesoFON(concave_path,save_tiled_env, filename, 
         shutil.copyfile(raster_surv, os.path.join(save_tiled_env,raster_surv_name+'.tif'))
         shutil.copyfile(raster_surv, target_ras_surv0)
         shutil.copyfile(raster_surv, target_ras_surv1)
- 
+
+def calcLevelCell (xyzw_cell_number, model_dfm, index_veg_cel, xyzw_nodes, xk, yk, read_data):
+    bulk_density = 1.1 ##gr/cm^3
+    
+    ba = model_dfm.get_var('ba') #surface area of the boxes (bottom area) {"location": "face", "shape": ["ndx"]}
+    
+    bl_val = np.empty((model_dfm.get_var('bl').shape[0],0))
+    for row in range(len(xyzw_cell_number)):
+        if index_veg_cel[row] == 1:
+            cell_area = ba[row]
+            
+            position = xyzw_cell_number[row,2].astype(int)
+                            
+            nodes_data = ma.compressed(xyzw_nodes[position][xyzw_nodes[position].mask == False]).astype(int)# select only the valid data (unmasked / false)
+            nodes_pos = np.block([[xk[nodes_data-1]],[yk[nodes_data-1]]]) # substracted to 1 in order to adjust the 0-based position in python
+            # Find the min max of each x,y coordinate
+            # create the list of x_min-x_max and y_min-y_max
+            x_range = [np.min(nodes_pos[0]), np.max(nodes_pos[0])]
+            y_range = [np.min(nodes_pos[1]), np.max(nodes_pos[1])]
+                            
+            # subsetting pandas 
+            read_data_subset = read_data[(read_data['GeoRefPosX'] >= x_range[0]) & 
+                                         (read_data['GeoRefPosX'] <= x_range[1])]
+            read_data_subset = read_data_subset[(read_data_subset['GeoRefPosY'] >= y_range[0]) & 
+                                                (read_data_subset['GeoRefPosY'] <= y_range[1])]
+            
+            bgb = 1.28 *  read_data_subset['dbh_cm']**1.17
+            bgb_kg_total = bgb.sum()
+            bgb_vol = bgb_kg_total * 1000 / bulk_density * 1E-6# m^3
+            bgb_level_veg = bgb_vol / cell_area # normalized bed level increase 
+            
+            bl_val = np.append(bl_val, bgb_level_veg)
+        else:
+            bgb_vol_bare = 0
+            bl_val = np.append(bl_val, bgb_vol_bare)
+    
+    return bl_val

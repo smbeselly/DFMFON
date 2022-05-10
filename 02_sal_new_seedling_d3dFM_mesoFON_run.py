@@ -48,7 +48,7 @@ from d3d_meso_mangro import modifyParamMesoFON #, createRaster4MesoFON, calcDrag
 from d3d_meso_mangro import csv2ClippedRaster, Sald3dNewRaster2Tiles #, clipSHPcreateXLSfromGPD
 from d3d_meso_mangro import SalNew_func_createRaster4MesoFON, newCalcDraginLoop
 from d3d_meso_mangro import New_clipSHPcreateXLSfromGPD, SalNew_Sal_func_createRaster4MesoFON
-from d3d_meso_mangro import initCalcDraginLoop, list_subset
+from d3d_meso_mangro import initCalcDraginLoop, list_subset, calcLevelCell
 from d3d_mangro_seeds import index_veg, seedling_establishment
 from d3d_mangro_seeds import seedling_dispersal, calculate_residual, collect_res
 from d3d_mangro_seeds import seedling_prob
@@ -80,6 +80,7 @@ MFON_Exchange = os.path.join(PROJ_HOME,'Model-Exchange')
 MFON_Env = os.path.join(MFON_Exchange, 'MesoFON-Env')
 MFON_Trees = os.path.join(MFON_Exchange, 'MesoFON-Trees')
 MFON_OUT = os.path.join(PROJ_HOME,'Model-Out','MesoFON')
+DFM_OUT = os.path.join(PROJ_HOME,'Model-Out','D3DFM')
 
 dir_out = os.path.join(MFON_Exchange, 'Initialization')
 
@@ -89,6 +90,9 @@ if not os.path.exists(figsavefolder):
 seedlings_out = os.path.join(PROJ_HOME,'Model-Out','MesoFON', 'Seedlings')
 if not os.path.exists(seedlings_out):
     os.makedirs(seedlings_out)
+botdepth_out = os.path.join(DFM_OUT, 'Bottom_Depth')
+if not os.path.exists(botdepth_out):
+    os.makedirs(botdepth_out)
 #%% Settings
 EPSG_Project = 32749 # EPSG code for WGS84/ UTM Zone 49S (Porong case study)
 coupling_period = 90 #days, actually 90 days
@@ -191,6 +195,11 @@ addition = np.zeros((model_dfm.get_var('ndx')-model_dfm.get_var('ndxi'))) + 0.00
 # drag_coeff = np.append(drag_coeff, addition)*ind
 drag_coeff = np.append(drag_coeff, addition)
 
+# initiate calculate subsurface contribution of mangrove roots
+bl_val = calcLevelCell(xyzw_cell_number, model_dfm, index_veg_cel, xyzw_nodes, xk, yk, read_data)
+addition_bl = np.zeros((model_dfm.get_var('ndx')-model_dfm.get_var('ndxi'))) + bl_val[-1]
+# model_dfm.get_var('bl')[bl_val.shape[0]-1:-1]
+bl_val = np.append(bl_val, addition_bl)
 #%% Get time reference from the model
 
 ## get the reference date and starttime of model
@@ -234,6 +243,13 @@ for ntime in range(int(coupling_ntimeUse)):
     salinity = np.empty((len(xz),0)) 
     #https://www.delftstack.com/howto/numpy/python-numpy-empty-array-append/
     
+    # calculate mangroves' subsurface contribution
+    try:
+        bl_model = model_dfm.get_var('bl') + bl_delta # the correct script
+        model_dfm.set_var('bl',bl_model)
+    except:
+        print('no bed level update, model initiation')
+        
     # find cells that have vegetation
     index_veg_cel = index_veg(model_dfm, xyzw_cell_number, xyzw_nodes, xk, yk, read_data)
     # predefine the pandas dataframe of the mangrove positions
@@ -322,9 +338,8 @@ for ntime in range(int(coupling_ntimeUse)):
         
         if t % model_dfm.get_time_step() == 0:
             # calculate the drag coefficient
-            drag_coeff = newCalcDraginLoop(xyzw_cell_number, xyzw_nodes, xk, yk, 
-                                           read_data, model_dfm, index_veg_cel,
-                                           list_read_subset)
+            drag_coeff = newCalcDraginLoop(xyzw_cell_number,read_data, model_dfm, 
+                                           index_veg_cel, list_read_subset)
             # drag_coeff = np.append(drag_coeff, addition)*ind 
             drag_coeff = np.append(drag_coeff, addition)
             # update the variable with new value
@@ -590,9 +605,20 @@ for ntime in range(int(coupling_ntimeUse)):
     
     # 12.3. Concatenated table is saved as txt file
     Concat_table.to_csv(os.path.join(MFON_OUT_compile, run_is+'.txt'), sep=',', index=False, header=True)
+    # save bottom depth as text to facilitate the ongoing simulation visualisation 
+    np.savetxt(os.path.join(botdepth_out, run_is+'.txt'), model_dfm.get_var('bl'), delimiter=",")
     
-    ### 13. Read the compile txt file and create the Cd
+    ### 13. Read the compile txt file to prepare for the next iteration
     read_data = Concat_table  
+    
+    # calculate below ground biomass contribution to bed level
+    bl_mangro = calcLevelCell(xyzw_cell_number, model_dfm, index_veg_cel, xyzw_nodes, xk, yk, read_data)
+    addition_bl_mangro = np.zeros((model_dfm.get_var('ndx')-model_dfm.get_var('ndxi'))) + bl_mangro[-1]
+    bl_mangro = np.append(bl_mangro, addition_bl_mangro)
+    # calculate the delta after every coupling 
+    bl_delta = bl_mangro - bl_val
+    # save current calcLevelCell value for the next iteration
+    bl_val = bl_mangro.copy()
     
     timeislast = datetime.datetime.now()
     print('End of coupling',str(ntime+1))
@@ -604,3 +630,4 @@ for ntime in range(int(coupling_ntimeUse)):
 model_dimr.finalize()   
 
 # %%
+
