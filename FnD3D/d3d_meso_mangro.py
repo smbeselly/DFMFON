@@ -1745,8 +1745,8 @@ def definePropVeg(xzyz_cell_number, model_dfm, ugrid_all, index_veg_cel, read_da
                                                 (read_data_subset['GeoRefPosY'] <= max(aa[:,1]))]
            
             rnveg_calc = read_data_subset.Height_cm.notnull().sum()/cell_area
-            diaveg_calc = read_data_subset.dbh_cm.quantile(0.7)/100
-            stemheight_calc = read_data_subset.Height_cm.quantile(0.7)/100
+            diaveg_calc = read_data_subset.dbh_cm.quantile(0.8)/100
+            stemheight_calc = read_data_subset.Height_cm.quantile(0.8)/100
             
             rnveg_coeff = np.append(rnveg_coeff, rnveg_calc)
             diaveg_coeff = np.append(diaveg_coeff, diaveg_calc)
