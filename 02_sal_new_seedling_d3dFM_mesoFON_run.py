@@ -13,13 +13,14 @@ This is the script for model include salinity and include seedlings establishmen
 #%% Input Folders and Files
 PROJ_HOME = r'D:\Git\d3d_meso'
 SYS_APP = r'D:\Git\d3d_meso/FnD3D'
-D3D_HOME = r'D:\Git\d3d_meso\Model-Execute\D3DFM\oss_artifacts_x64_140691'
+D3D_HOME = r'D:\Git\d3d_meso\Model-Execute\D3DFM\2sebrian_20220518' #sal_veg-OK
+# D3D_HOME = r'D:\Git\d3d_meso\Model-Execute\D3DFM\oss_artifacts_x64_140691' #veg-OK
 gdal_loc = r'D:\Program_Files\Anaconda3\envs\d3dfm_39\Lib\site-packages\osgeo_utils'
 JAVA_Exe = r'C:\Users\sbe002\RepastSimphony-2.8\eclipse\jdk11\bin\java.exe'
 
-D3D_Model = 'FunnelMorphMF30_Adjusted_Saline_geser_2'
-D3D_Domain = 'Grid_Funnel_1_net.nc'
-config_xml = 'FunnelMorphMF30_Adjusted_Saline_geser.xml'
+D3D_Model = 'model_run_6_flat'
+D3D_Domain = 'Grid_Funnel_20_by_20_net.nc'
+config_xml = 'model_run_6_flat.xml'
 mdu_file = 'FlowFM.mdu'
 
 Mangr_SHP = 'geserMangroveAgeMerged.shp'
@@ -40,6 +41,7 @@ sys.path.append(SYS_APP) # as this Func will be in the same folder, no longer ne
 np.seterr(invalid='ignore')
 
 from dfm_tools.get_nc import get_ncmodeldata
+from dfm_tools.get_nc import get_netdata
 # from dfm_tools.io.polygon import Polygon
 from dfm_tools.io.mdu import read_deltares_ini
 from d3d_meso_mangro import create_xyzwCellNumber, create_xyzwNodes #, calcDragCoeff 
@@ -49,7 +51,10 @@ from d3d_meso_mangro import csv2ClippedRaster, Sald3dNewRaster2Tiles #, clipSHPc
 from d3d_meso_mangro import SalNew_func_createRaster4MesoFON, newCalcDraginLoop
 from d3d_meso_mangro import New_clipSHPcreateXLSfromGPD, SalNew_Sal_func_createRaster4MesoFON
 from d3d_meso_mangro import initCalcDraginLoop, list_subset, calcLevelCell
-from d3d_mangro_seeds import index_veg, seedling_establishment
+from d3d_meso_mangro import create_xzyzCellNumber, initCalcDraginLoopCdveg,definePropVeg
+from d3d_meso_mangro import calcLevelCellCdveg, list_subsetCdveg,newCalcDraginLoopCdveg
+
+from d3d_mangro_seeds import index_veg_cdveg, seedling_establishment
 from d3d_mangro_seeds import seedling_dispersal, calculate_residual, collect_res
 from d3d_mangro_seeds import seedling_prob
 
@@ -64,7 +69,7 @@ import shutil
 from scipy.interpolate import interp1d
 from dateutil import parser
 import datetime
-# import copy
+import copy
 
 ## Set the paths for dll-files and input-files for DFM
 PROJ_HOME = os.path.join(PROJ_HOME)
@@ -163,8 +168,10 @@ xzw = model_dfm.get_var('xzw') #x coordinate of the center of gravity of the box
 yzw = model_dfm.get_var('yzw') #y coordinate
 
 #### calculate the cell number as in the position of xzw and yzw or ndxi
-xyzw_cell_number = create_xyzwCellNumber(xzw,yzw,mesh_face_x,mesh_face_y)
-xyzw_nodes = create_xyzwNodes(mesh_face_nodes,xyzw_cell_number)
+ugrid_all = get_netdata(file_nc=grid_file)
+# xyzw_cell_number = create_xyzwCellNumber(xzw,yzw,mesh_face_x,mesh_face_y)
+# xyzw_nodes = create_xyzwNodes(mesh_face_nodes,xyzw_cell_number)
+xzyz_cell_number = create_xzyzCellNumber(xz, yz, model_dfm, ugrid_all)
 
 #### Read Master Trees
 master_trees = gpd.read_file(os.path.join(MFON_Trees, 'Master-Trees', Mangr_SHP))
@@ -179,7 +186,6 @@ master_trees = gpd.read_file(os.path.join(MFON_Trees, 'Master-Trees', Mangr_SHP)
 MFON_OUT_compile = os.path.join(MFON_OUT,'Compile')
 
 read_data = pd.read_csv(os.path.join(MFON_OUT_compile,'Coupling_0.txt'))
-read_data['Height_cm'] = read_data['Height_cm']
 
 # use spatial in scipy to match the x,y of the mangroves and the age information.
 # age_coupling0 = calcAgeCoupling0(read_data, master_trees)
@@ -187,19 +193,22 @@ read_data['Height_cm'] = read_data['Height_cm']
 age_coupling = read_data['Age']
 
 # For loop for all of the cell number
-index_veg_cel = index_veg(model_dfm, xyzw_cell_number, xyzw_nodes, xk, yk, read_data)
-drag_coeff = initCalcDraginLoop(xyzw_cell_number, xyzw_nodes, xk, yk, 
-                               read_data, model_dfm, index_veg_cel)
+index_veg_cel = index_veg_cdveg(xzyz_cell_number, ugrid_all, read_data)
+drag_coeff = initCalcDraginLoopCdveg(xzyz_cell_number, model_dfm, ugrid_all, 
+                                     index_veg_cel, read_data)
 # assume that the boundary flow nodes are located at the end of array
 addition = np.zeros((model_dfm.get_var('ndx')-model_dfm.get_var('ndxi'))) + 0.005  
+addition_veg = copy.copy(addition)*0
 # drag_coeff = np.append(drag_coeff, addition)*ind
 drag_coeff = np.append(drag_coeff, addition)
 
 # initiate calculate subsurface contribution of mangrove roots
-bl_val = calcLevelCell(xyzw_cell_number, model_dfm, index_veg_cel, xyzw_nodes, xk, yk, read_data)
+bl_val = calcLevelCellCdveg (model_dfm, ugrid_all, xzyz_cell_number, index_veg_cel, read_data)
 addition_bl = np.zeros((model_dfm.get_var('ndx')-model_dfm.get_var('ndxi'))) + bl_val[-1]
 # model_dfm.get_var('bl')[bl_val.shape[0]-1:-1]
 bl_val = np.append(bl_val, addition_bl)
+
+
 #%% Get time reference from the model
 
 ## get the reference date and starttime of model
@@ -237,6 +246,13 @@ for ntime in range(int(coupling_ntimeUse)):
     # do the calculation for each coupling_ntime
     print('Start the coupling',str(ntime+1),'computation')
     ### 1.1. run the DFM all the simulation time within ntime
+    rnveg_coeff, diaveg_coeff, stemheight_coeff = definePropVeg(xzyz_cell_number, 
+                            model_dfm, ugrid_all, index_veg_cel, read_data, addition_veg)
+
+    model_dfm.set_var('rnveg',rnveg_coeff)
+    model_dfm.set_var('diaveg',diaveg_coeff)
+    model_dfm.set_var('stemheight',stemheight_coeff)
+    
     # update the variable with new value taken from previous drag calculation
     model_dfm.set_var('Cdvegsp',drag_coeff)
     water_level = np.empty((len(xz),0)) 
@@ -251,9 +267,9 @@ for ntime in range(int(coupling_ntimeUse)):
         print('no bed level update, model initiation')
         
     # find cells that have vegetation
-    index_veg_cel = index_veg(model_dfm, xyzw_cell_number, xyzw_nodes, xk, yk, read_data)
+    index_veg_cel = index_veg_cdveg(xzyz_cell_number, ugrid_all, read_data)
     # predefine the pandas dataframe of the mangrove positions
-    list_read_subset = list_subset(xyzw_cell_number, index_veg_cel, xyzw_nodes, xk, yk, read_data)
+    list_read_subset = list_subsetCdveg(ugrid_all, xzyz_cell_number, index_veg_cel, read_data)
         
     try:
         list_seed2sapl.append(seedling_finalpos)
@@ -338,9 +354,8 @@ for ntime in range(int(coupling_ntimeUse)):
         
         if t % model_dfm.get_time_step() == 0:
             # calculate the drag coefficient
-            drag_coeff = newCalcDraginLoop(xyzw_cell_number,read_data, model_dfm, 
-                                           index_veg_cel, list_read_subset)
-            # drag_coeff = np.append(drag_coeff, addition)*ind 
+            drag_coeff = newCalcDraginLoopCdveg(model_dfm,xzyz_cell_number, 
+                                                index_veg_cel,list_read_subset)
             drag_coeff = np.append(drag_coeff, addition)
             # update the variable with new value
             model_dfm.set_var('Cdvegsp',drag_coeff)
@@ -368,6 +383,8 @@ for ntime in range(int(coupling_ntimeUse)):
     else:
         residual_is = []
     med_sal = np.median(salinity, axis=1)
+    # nozero = np.ma.masked_equal(salinity, 0)
+    # med_sal = np.ma.median(nozero, axis=1)
     print('Calculate median salinity in coupling',str(ntime+1))
     
     # 1.3. Prepare pandas for list of the seedling_finalpos
@@ -375,10 +392,8 @@ for ntime in range(int(coupling_ntimeUse)):
     # check condition
     if len(residual_is) != 0:
         print('calculate seedlings position for year', curyr )
-        seedling_finalpos = seedling_dispersal(xyzw_cell_number, index_veg_cel, 
-                                               xyzw_nodes, xk, yk, read_data, 
-                                               med_sal, residual_is, model_dfm, 
-                                               reftime, cursec)
+        seedling_finalpos = seedling_dispersal(xzyz_cell_number, index_veg_cel, ugrid_all, read_data, 
+                               med_sal, residual_is, model_dfm, reftime, cursec)
         # check seedlngs duplicate
         bool_series = seedling_finalpos.duplicated(keep='first')
         seedling_finalpos = seedling_finalpos[~bool_series]
@@ -451,8 +466,8 @@ for ntime in range(int(coupling_ntimeUse)):
         
     ## Filter seedlings based on the surv_val
     if seedling_finalpos.size > 0:
-        seedling_finalpos_2 = seedling_prob(seedling_finalpos, xyzw_cell_number, 
-                                         xyzw_nodes, xk, yk, surv_val)
+        seedling_finalpos_2 = seedling_prob(seedling_finalpos, xzyz_cell_number, 
+                                            ugrid_all, surv_val)
         seedling_finalpos = seedling_finalpos_2
     
     ### 4. Convert from data point to raster environment 
@@ -610,7 +625,7 @@ for ntime in range(int(coupling_ntimeUse)):
     read_data = Concat_table  
     
     # calculate below ground biomass contribution to bed level
-    bl_mangro = calcLevelCell(xyzw_cell_number, model_dfm, index_veg_cel, xyzw_nodes, xk, yk, read_data)
+    bl_mangro = calcLevelCellCdveg (model_dfm, ugrid_all, xzyz_cell_number, index_veg_cel, read_data)
     addition_bl_mangro = np.zeros((model_dfm.get_var('ndx')-model_dfm.get_var('ndxi'))) + bl_mangro[-1]
     bl_mangro = np.append(bl_mangro, addition_bl_mangro)
     # calculate the delta after every coupling 

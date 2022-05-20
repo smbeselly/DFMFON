@@ -38,6 +38,25 @@ def index_veg(model_dfm, xyzw_cell_number, xyzw_nodes, xk, yk, read_data):
     
     return index_veg_cel
 
+def index_veg_cdveg(xzyz_cell_number, ugrid_all, read_data):
+    index_veg_cel = np.empty((xzyz_cell_number.shape[0],0))
+    data_verts = ugrid_all.verts
+    for row in range(len(xzyz_cell_number)):
+        position = xzyz_cell_number[row,2].astype(int)
+        aa = data_verts[position,:,:]
+        # subsetting pandas 
+        read_data_subset = read_data[(read_data['GeoRefPosX'] >= min(aa[:,0])) & 
+                                     (read_data['GeoRefPosX'] <= max(aa[:,0]))]
+        read_data_subset = read_data_subset[(read_data_subset['GeoRefPosY'] >= min(aa[:,1])) & 
+                                            (read_data_subset['GeoRefPosY'] <= max(aa[:,1]))]
+        if read_data_subset.shape[0] == 0: #if 0 then skip
+            index_is = 0
+        else:
+            index_is = 1
+        index_veg_cel = np.append(index_veg_cel, index_is)
+    
+    return index_veg_cel
+
 class seedling_establishment():
     def __init__(self,data_mangrove):
         self.data_mangrove = data_mangrove
@@ -157,6 +176,19 @@ def subsetting_cell(xyzw_cell_number, row, xyzw_nodes, xk, yk, read_data):
     
     return read_data_subset
 
+def subsetting_cellCdveg(ugrid_all, xzyz_cell_number, row, read_data):
+    data_verts = ugrid_all.verts
+    position = xzyz_cell_number[row,2].astype(int)
+     
+    aa = data_verts[position,:,:]
+    # subsetting pandas 
+    read_data_subset = read_data[(read_data['GeoRefPosX'] >= min(aa[:,0])) & 
+                                 (read_data['GeoRefPosX'] <= max(aa[:,0]))]
+    read_data_subset = read_data_subset[(read_data_subset['GeoRefPosY'] >= min(aa[:,1])) & 
+                                        (read_data_subset['GeoRefPosY'] <= max(aa[:,1]))]
+    
+    return read_data_subset
+
 # =============================================================================
 # def seedling_dispersal(xyzw_cell_number, index_veg_cel, xyzw_nodes, xk, yk, 
 #                        read_data, med_sal, residual_is, model_dfm, reftime, cursec):
@@ -183,15 +215,20 @@ def subsetting_cell(xyzw_cell_number, row, xyzw_nodes, xk, yk, read_data):
 #     return seedling_finalpos
 # =============================================================================
 
-def seedling_dispersal(xyzw_cell_number, index_veg_cel, xyzw_nodes, xk, yk, 
-                       read_data, med_sal, residual_is, model_dfm, reftime, cursec):
+# def seedling_dispersal(xyzw_cell_number, index_veg_cel, xyzw_nodes, xk, yk, 
+#                        read_data, med_sal, residual_is, model_dfm, reftime, cursec):
+def seedling_dispersal(xzyz_cell_number, index_veg_cel, ugrid_all, read_data, 
+                       med_sal, residual_is, model_dfm, reftime, cursec):
     list_of_seeds = [] 
-    for row in range(len(xyzw_cell_number)):
+    for row in range(len(xzyz_cell_number)):
+    # for row in range(len(xyzw_cell_number)):
         # print(row) # row yang ada veg adalah 78
         if index_veg_cel[row] == 1:
             # print (index_veg_cel[row] == 1, row)
-            read_data_subset = subsetting_cell(xyzw_cell_number, row, 
-                                               xyzw_nodes, xk, yk, read_data)  
+            # read_data_subset = subsetting_cell(xyzw_cell_number, row, 
+            #                                    xyzw_nodes, xk, yk, read_data)  
+            read_data_subset = subsetting_cellCdveg(ugrid_all, xzyz_cell_number, 
+                                                    row, read_data)
             seedss = seedling_establishment(read_data_subset)
             Nn = seedss.establishment_avicennia(med_sal[row])
             Nn = Nn.reset_index(drop=True)
@@ -264,15 +301,18 @@ def collect_res( model_dfm, res_curr_x, res_curr_y):
 
 # function to filter the probability of the dispersed seedlings due to WoO
 
-def seedling_prob(sdlg_fnl_pos, xyzw_cell_number,xyzw_nodes, xk, yk, surv_val):
+# def seedling_prob(sdlg_fnl_pos, xyzw_cell_number,xyzw_nodes, xk, yk, surv_val):
+def seedling_prob(sdlg_fnl_pos, xzyz_cell_number, ugrid_all, surv_val):
     list_of_seeds = [] 
-    for row in range(len(xyzw_cell_number)):
+    # for row in range(len(xyzw_cell_number)):
+    for row in range(len(xzyz_cell_number)):
         # print(row) # row yang ada veg adalah 78
         # div_of_seeds = []
         # if index_veg_cel[row] == 1:
             # print (index_veg_cel[row] == 1, row)
-        read_data_subset = subsetting_cell(xyzw_cell_number, row, 
-                                           xyzw_nodes, xk, yk, sdlg_fnl_pos)
+        # read_data_subset = subsetting_cell(xyzw_cell_number, row, 
+        #                                    xyzw_nodes, xk, yk, sdlg_fnl_pos)
+        read_data_subset = subsetting_cellCdveg(ugrid_all, xzyz_cell_number, row, sdlg_fnl_pos)
         surv_val_in_row = surv_val[row]
         
         if surv_val_in_row <= 0.3:

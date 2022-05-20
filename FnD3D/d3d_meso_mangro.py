@@ -30,7 +30,6 @@ from d3d_prep_raster import d3dPolySHP
 
 import pandas as pd
 from xlrd import open_workbook
-from xlutils.copy import copy
 import rasterio as rio
 from affine import Affine
 
@@ -80,6 +79,36 @@ def create_xyzwCellNumber(xzw,yzw,mesh_face_x,mesh_face_y):
         xyzw_cell_number[row,2] = index[1]
     
     return xyzw_cell_number
+
+def create_xzyzCellNumber(xz, yz, model_dfm, ugrid_all):
+    xzyz = np.block([[xz],[yz]]).T 
+    xzyz = xzyz[:model_dfm.get_var('ndxi')]
+    
+    df_xzyz = pd.DataFrame(xzyz)
+    
+    data_verts = ugrid_all.verts
+    
+    vegsp_index = np.zeros((len(xzyz),2))
+    vegsp_index[:,0] = np.arange(0,len(xzyz))
+    
+    for row in range(len(data_verts[:,0,0])):
+        aa = data_verts[row,:,:]
+        
+        ab_subset = df_xzyz[(df_xzyz[0] > min(aa[:,0])) & 
+                                     (df_xzyz[0] < max(aa[:,0]))]
+        ab_subset = ab_subset[(ab_subset[1] > min(aa[:,1])) & 
+                                            (ab_subset[1] < max(aa[:,1]))]
+        vegsp_index[row,1] = ab_subset.index.to_numpy()
+        # vegsp_index[row,1] = 3*row
+        
+    #sort the numpy array by xzyz index
+    sorted_vegsp_index = vegsp_index[vegsp_index[:,1].argsort()]
+    #create xzyz_cell_number
+    xzyz_cell_number = np.zeros((len(vegsp_index),3))
+    xzyz_cell_number[:,0:2] = xzyz
+    xzyz_cell_number[:,2] = sorted_vegsp_index[:,0]
+    
+    return xzyz_cell_number
 
 #%% Function to rearrange the mesh_face_nodes that previously based on cell number
 # now rearrange this based on the ndxi index -> create new matrix
@@ -1041,6 +1070,26 @@ def list_subset(xyzw_cell_number, index_veg_cel, xyzw_nodes, xk, yk, read_data):
         
     return list_read_subset
 
+def list_subsetCdveg(ugrid_all, xzyz_cell_number, index_veg_cel, read_data):
+    # this function is to predefine the subset before calculate drag
+    data_verts = ugrid_all.verts    
+    list_read_subset = []
+    for row in range(len(xzyz_cell_number)):
+        if index_veg_cel[row] == 0:
+            read_data_subset = np.nan
+        else:
+            position = xzyz_cell_number[row,2].astype(int)
+            aa = data_verts[position,:,:]
+            # subsetting pandas 
+            read_data_subset = read_data[(read_data['GeoRefPosX'] >= min(aa[:,0])) & 
+                                         (read_data['GeoRefPosX'] <= max(aa[:,0]))]
+            read_data_subset = read_data_subset[(read_data_subset['GeoRefPosY'] >= min(aa[:,1])) & 
+                                                (read_data_subset['GeoRefPosY'] <= max(aa[:,1]))]
+        
+        list_read_subset.append(read_data_subset)
+        
+    return list_read_subset
+
 ### drag predictor formula
 def initCalcDraginLoop(xyzw_cell_number, xyzw_nodes, xk, yk, read_data, model_dfm, index_veg_cel):
     Cd_no = 0.005 # assume drag coefficient without the presence of vegetation
@@ -1161,6 +1210,86 @@ def initCalcDraginLoop(xyzw_cell_number, xyzw_nodes, xk, yk, read_data, model_df
         
     return drag_coeff
 
+def initCalcDraginLoopCdveg(xzyz_cell_number, model_dfm, ugrid_all, index_veg_cel, read_data):
+    Cd_no = 0.005 # assume drag coefficient without the presence of vegetation 
+    d_pneu = 0.01 # m
+    h_pneu = 0.15 # m
+    f_pneu = 0.3 # const in van Maanen
+    D05_pneu = 20 # const in van Maanen
+    
+    ba = model_dfm.get_var('ba') #surface area of the boxes (bottom area) {"location": "face", "shape": ["ndx"]}
+    hs = model_dfm.get_var('hs') #water depth at the end of timestep {"location": "face", "shape": ["ndx"]}
+    
+    data_verts = ugrid_all.verts
+    
+    drag_coeff = np.empty((model_dfm.get_var('Cdvegsp').shape[0],0))
+    for row in range(len(xzyz_cell_number)):
+        if index_veg_cel[row] == 0:
+            Cd_calc_bare = 0.005
+            drag_coeff = np.append(drag_coeff, Cd_calc_bare)
+        else:
+            # calculate cell_area and water_depth
+            cell_area = ba[row] # sudah sesuai karena boundary ada di array paling akhir
+            water_depth = hs[row]# sama seperti di atas
+            # sometimes there is a condition where the cell is dry
+            # therefore, if it is dry I set the drag as Cd_no
+            if water_depth == 0:
+                Cd_calc_bare = 0.005
+                drag_coeff = np.append(drag_coeff, Cd_calc_bare)
+            else:
+                # print(row)
+                # find the position based on the cell number
+                position = xzyz_cell_number[row,2].astype(int)
+                aa = data_verts[position,:,:]
+                # subsetting pandas 
+                read_data_subset = read_data[(read_data['GeoRefPosX'] >= min(aa[:,0])) & 
+                                             (read_data['GeoRefPosX'] <= max(aa[:,0]))]
+                read_data_subset = read_data_subset[(read_data_subset['GeoRefPosY'] >= min(aa[:,1])) & 
+                                                    (read_data_subset['GeoRefPosY'] <= max(aa[:,1]))]
+               
+                # Volume of the aerial roots
+                N_pneu = 10025*(1/(1+np.exp(f_pneu*(D05_pneu-read_data_subset['dbh_cm']))))
+                          
+                # if function to adjust the h_pneu for Avicennia
+                # this equation is from Du, Qin, et al. 2021
+                if water_depth < h_pneu:
+                    Vm_pneu = np.pi*d_pneu*water_depth/12
+                else:
+                    Vm_pneu = np.pi*d_pneu*h_pneu/12
+            
+                Vm_pneu_total = Vm_pneu*N_pneu #m^3
+                Am_pneu_total = d_pneu*h_pneu*N_pneu #m^2
+            
+                # Calculate the d_0 from height of the tree, wait for Uwe Grueter Confirmation
+                # height is adjusted from the water depth
+                Vm_trunk = np.pi/4*(read_data_subset['dbh_cm']/100)**2*water_depth #m^3 
+                Am_trunk = (read_data_subset['dbh_cm']/100)*water_depth #m^3 
+            
+                # sum of the obstacle volume
+                Vm = Vm_pneu_total + Vm_trunk #m^3
+                # sum of the obstacle area
+                Am = Am_pneu_total + Am_trunk#m^2
+            
+                # Volume of the control water
+            
+                V = cell_area*water_depth
+            
+                # Characteristic Length (m)
+                L = (V-Vm)/Am
+                # Cd_no = 0.005 # assume drag coefficient without the presence of vegetation
+                e_drag = 5 # set to 5m to obtain realistic value for Cd
+            
+                Cd_calc = (Cd_no + (e_drag/L)).sum()
+                # TODO this is just for reminder of the commented script
+                # is it really needed to calculate the weighted drag?
+                # Cd_calc_weighted = Cd_calc*(Vm.sum()/V) + Cd_no * ((V-Vm.sum())/V)
+                
+                # append the calculated cd_veg to the drag_coeff list
+                # drag_coeff.append(cd_veg)
+                drag_coeff = np.append(drag_coeff, Cd_calc)
+        
+    return drag_coeff
+
 def newCalcDraginLoop(xyzw_cell_number, read_data, model_dfm, index_veg_cel, list_read_subset):
     Cd_no = 0.005 # assume drag coefficient without the presence of vegetation
     # Parameters of the CPRS and Number of Pneumatophore as in Vovides, et al.,2016
@@ -1199,10 +1328,17 @@ def newCalcDraginLoop(xyzw_cell_number, read_data, model_dfm, index_veg_cel, lis
     hs = model_dfm.get_var('hs') #water depth at the end of timestep {"location": "face", "shape": ["ndx"]}
     
     drag_coeff = np.empty((model_dfm.get_var('Cdvegsp').shape[0],0))
+    rnveg_coeff = np.empty((model_dfm.get_var('Cdvegsp').shape[0],0))
+    diaveg_coeff = np.empty((model_dfm.get_var('Cdvegsp').shape[0],0))
+    stemheight_coeff = np.empty((model_dfm.get_var('Cdvegsp').shape[0],0))
+    
     for row in range(len(xyzw_cell_number)):
         if index_veg_cel[row] == 0:
             Cd_calc_bare = 0.005
             drag_coeff = np.append(drag_coeff, Cd_calc_bare)
+            rnveg_coeff = np.append(rnveg_coeff, 0)
+            diaveg_coeff = np.append(diaveg_coeff, 0)
+            stemheight_coeff = np.append(stemheight_coeff, 0)
         else:
             # calculate cell_area and water_depth
             cell_area = ba[row] # sudah sesuai karena boundary ada di array paling akhir
@@ -1212,6 +1348,9 @@ def newCalcDraginLoop(xyzw_cell_number, read_data, model_dfm, index_veg_cel, lis
             if water_depth == 0:
                 Cd_calc_bare = 0.005
                 drag_coeff = np.append(drag_coeff, Cd_calc_bare)
+                rnveg_coeff = np.append(rnveg_coeff, 0)
+                diaveg_coeff = np.append(diaveg_coeff, 0)
+                stemheight_coeff = np.append(stemheight_coeff, 0)
             else:
                 # print(row)
                # find the position based on the cell number
@@ -1282,6 +1421,94 @@ def newCalcDraginLoop(xyzw_cell_number, read_data, model_dfm, index_veg_cel, lis
                 # append the calculated cd_veg to the drag_coeff list
                 # drag_coeff.append(cd_veg)
                 drag_coeff = np.append(drag_coeff, Cd_calc)
+                
+                # calculate rnveg, diaveg, and stemheight
+                rnveg_calc = read_data_subset.Height_cm.notnull().sum()
+                diaveg_calc = read_data_subset.dbh_cm.quantile(0.7)/100
+                stemheight_calc = read_data_subset.Height_cm.quantile(0.7)/100
+                
+                rnveg_coeff = np.append(rnveg_coeff, rnveg_calc)
+                diaveg_coeff = np.append(diaveg_coeff, diaveg_calc)
+                stemheight_coeff = np.append(stemheight_coeff, stemheight_calc)
+                
+        
+    return drag_coeff, rnveg_coeff, diaveg_coeff, stemheight_coeff
+
+def newCalcDraginLoopCdveg(model_dfm, xzyz_cell_number, index_veg_cel,list_read_subset):
+    Cd_no = 0.005 # assume drag coefficient without the presence of vegetation
+    
+    d_pneu = 0.01 # m
+    h_pneu = 0.15 # m
+    f_pneu = 0.3 # const in van Maanen
+    D05_pneu = 20 # const in van Maanen
+        
+    ba = model_dfm.get_var('ba') #surface area of the boxes (bottom area) {"location": "face", "shape": ["ndx"]}
+    hs = model_dfm.get_var('hs') #water depth at the end of timestep {"location": "face", "shape": ["ndx"]}
+    
+    drag_coeff = np.empty((model_dfm.get_var('Cdvegsp').shape[0],0))
+
+    for row in range(len(xzyz_cell_number)):
+        if index_veg_cel[row] == 0:
+            Cd_calc_bare = 0.005
+            drag_coeff = np.append(drag_coeff, Cd_calc_bare)
+
+        else:
+            # calculate cell_area and water_depth
+            cell_area = ba[row] # sudah sesuai karena boundary ada di array paling akhir
+            water_depth = hs[row]# sama seperti di atas
+            # sometimes there is a condition where the cell is dry
+            # therefore, if it is dry I set the drag as Cd_no
+            if water_depth == 0:
+                Cd_calc_bare = 0.005
+                drag_coeff = np.append(drag_coeff, Cd_calc_bare)
+
+            else:
+                # print(row)
+                 
+                read_data_subset = list_read_subset[row]
+                
+    
+
+                # Volume of the aerial roots
+                N_pneu = 10025*(1/(1+np.exp(f_pneu*(D05_pneu-read_data_subset['dbh_cm']))))
+                          
+                # if function to adjust the h_pneu for Avicennia
+                # this equation is from Du, Qin, et al. 2021
+                if water_depth < h_pneu:
+                    Vm_pneu = np.pi*d_pneu*water_depth/12
+                else:
+                    Vm_pneu = np.pi*d_pneu*h_pneu/12
+            
+                Vm_pneu_total = Vm_pneu*N_pneu #m^3
+                Am_pneu_total = d_pneu*h_pneu*N_pneu #m^2
+            
+                # Calculate the d_0 from height of the tree, wait for Uwe Grueter Confirmation
+                # height is adjusted from the water depth
+                Vm_trunk = np.pi/4*(read_data_subset['dbh_cm']/100)**2*water_depth #m^3 
+                Am_trunk = (read_data_subset['dbh_cm']/100)*water_depth #m^3 
+            
+                # sum of the obstacle volume
+                Vm = Vm_pneu_total + Vm_trunk #m^3
+                # sum of the obstacle area
+                Am = Am_pneu_total + Am_trunk#m^2
+            
+                # Volume of the control water
+            
+                V = cell_area*water_depth
+            
+                # Characteristic Length (m)
+                L = (V-Vm)/Am
+                # Cd_no = 0.005 # assume drag coefficient without the presence of vegetation
+                e_drag = 5 # set to 5m to obtain realistic value for Cd
+            
+                Cd_calc = (Cd_no + (e_drag/L)).sum()
+                # TODO this is just for reminder of the commented script
+                # is it really needed to calculate the weighted drag?
+                # Cd_calc_weighted = Cd_calc*(Vm.sum()/V) + Cd_no * ((V-Vm.sum())/V)
+                
+                # append the calculated cd_veg to the drag_coeff list
+                # drag_coeff.append(cd_veg)
+                drag_coeff = np.append(drag_coeff, Cd_calc)                
         
     return drag_coeff
 
@@ -1454,3 +1681,79 @@ def calcLevelCell (xyzw_cell_number, model_dfm, index_veg_cel, xyzw_nodes, xk, y
             bl_val = np.append(bl_val, bgb_vol_bare)
     
     return bl_val
+
+def calcLevelCellCdveg (model_dfm, ugrid_all, xzyz_cell_number, index_veg_cel, read_data):
+    bulk_density = 1.1 ##gr/cm^3
+    
+    ba = model_dfm.get_var('ba') #surface area of the boxes (bottom area) {"location": "face", "shape": ["ndx"]}
+    data_verts = data_verts = ugrid_all.verts
+    
+    bl_val = np.empty((model_dfm.get_var('bl').shape[0],0))
+    for row in range(len(xzyz_cell_number)):
+        if index_veg_cel[row] == 1:
+            cell_area = ba[row]
+            
+            position = xzyz_cell_number[row,2].astype(int)
+            aa = data_verts[position,:,:]
+            # subsetting pandas 
+            read_data_subset = read_data[(read_data['GeoRefPosX'] >= min(aa[:,0])) & 
+                                         (read_data['GeoRefPosX'] <= max(aa[:,0]))]
+            read_data_subset = read_data_subset[(read_data_subset['GeoRefPosY'] >= min(aa[:,1])) & 
+                                                (read_data_subset['GeoRefPosY'] <= max(aa[:,1]))]
+            
+            bgb = 1.28 *  read_data_subset['dbh_cm']**1.17
+            bgb_kg_total = bgb.sum()
+            bgb_vol = bgb_kg_total * 1000 / bulk_density * 1E-6# m^3
+            bgb_level_veg = bgb_vol / cell_area # normalized bed level increase 
+            
+            bl_val = np.append(bl_val, bgb_level_veg)
+        else:
+            bgb_vol_bare = 0
+            bl_val = np.append(bl_val, bgb_vol_bare)
+    
+    return bl_val
+
+def definePropVeg(xzyz_cell_number, model_dfm, ugrid_all, index_veg_cel, read_data, addition_veg):
+    
+    ba = model_dfm.get_var('ba') #surface area of the boxes (bottom area) {"location": "face", "shape": ["ndx"]}
+    hs = model_dfm.get_var('hs') #water depth at the end of timestep {"location": "face", "shape": ["ndx"]}
+    ## initialisation of vegetation variables
+
+    data_verts = ugrid_all.verts
+    
+    rnveg_coeff = np.zeros((model_dfm.get_var('Cdvegsp').shape[0],0))
+    diaveg_coeff = np.zeros((model_dfm.get_var('Cdvegsp').shape[0],0))
+    stemheight_coeff = np.zeros((model_dfm.get_var('Cdvegsp').shape[0],0))
+    
+    for row in range(len(xzyz_cell_number)):
+        if index_veg_cel[row] == 0:
+            rnveg_coeff = np.append(rnveg_coeff, 0)
+            diaveg_coeff = np.append(diaveg_coeff, 0)
+            stemheight_coeff = np.append(stemheight_coeff, 0)
+        else:
+            # calculate cell_area and water_depth
+            cell_area = ba[row] # sudah sesuai karena boundary ada di array paling akhir
+
+            # print(row)
+            # find the position based on the cell number
+            position = xzyz_cell_number[row,2].astype(int)
+            aa = data_verts[position,:,:]
+            # subsetting pandas 
+            read_data_subset = read_data[(read_data['GeoRefPosX'] >= min(aa[:,0])) & 
+                                         (read_data['GeoRefPosX'] <= max(aa[:,0]))]
+            read_data_subset = read_data_subset[(read_data_subset['GeoRefPosY'] >= min(aa[:,1])) & 
+                                                (read_data_subset['GeoRefPosY'] <= max(aa[:,1]))]
+           
+            rnveg_calc = read_data_subset.Height_cm.notnull().sum()/cell_area
+            diaveg_calc = read_data_subset.dbh_cm.quantile(0.7)/100
+            stemheight_calc = read_data_subset.Height_cm.quantile(0.7)/100
+            
+            rnveg_coeff = np.append(rnveg_coeff, rnveg_calc)
+            diaveg_coeff = np.append(diaveg_coeff, diaveg_calc)
+            stemheight_coeff = np.append(stemheight_coeff, stemheight_calc)
+     
+    rnveg_coeff = np.append(rnveg_coeff, addition_veg)
+    diaveg_coeff = np.append(diaveg_coeff, addition_veg)
+    stemheight_coeff = np.append(stemheight_coeff, addition_veg)
+    
+    return rnveg_coeff, diaveg_coeff, stemheight_coeff
