@@ -103,6 +103,7 @@ EPSG_Project = 32749 # EPSG code for WGS84/ UTM Zone 49S (Porong case study)
 coupling_period = 90 #days, actually 90 days
 MorFac = 30 
 woo_inun = 3 # inundation free period (days)
+LLWL = -1.2
 species_name = 'Avicennia_marina'
 
 x_res = 10
@@ -215,12 +216,20 @@ bl_val = np.append(bl_val, addition_bl)
 getmdu = read_deltares_ini(mdu_file)
 refdate = getmdu[(getmdu['section'] == 'time') & (getmdu['key'] == 'RefDate')]['value']
 tstart = getmdu[(getmdu['section'] == 'time') & (getmdu['key'] == 'TStart')]['value']
+tend = getmdu[(getmdu['section'] == 'time') & (getmdu['key'] == 'TStop')]['value']
 
 # parse dfm's time in string to datetime var in Python
 refdatet = parser.parse(refdate.iloc[0])
 tstartt = datetime.timedelta(seconds=float(tstart.iloc[0]))
+tendd = datetime.timedelta(seconds=float(tend.iloc[0]))
 #reference time is
 reftime = refdatet+tstartt
+timeend = refdatet+tendd
+timendwmorf = refdatet+ (tendd*MorFac)
+
+print('start simulation time', reftime)
+print('end of simulation in DFM', timeend)
+print('end of simulation with MorFac', timendwmorf)
 
 #%% Loop the Coupling
 # change from days to second
@@ -246,6 +255,11 @@ for ntime in range(int(coupling_ntimeUse)):
     # do the calculation for each coupling_ntime
     print('Start the coupling',str(ntime+1),'computation')
     ### 1.1. run the DFM all the simulation time within ntime
+    # find cells that have vegetation
+    index_veg_cel = index_veg_cdveg(xzyz_cell_number, ugrid_all, read_data)
+    # predefine the pandas dataframe of the mangrove positions
+    list_read_subset = list_subsetCdveg(ugrid_all, xzyz_cell_number, index_veg_cel, read_data)
+    
     rnveg_coeff, diaveg_coeff, stemheight_coeff = definePropVeg(xzyz_cell_number, 
                             model_dfm, ugrid_all, index_veg_cel, read_data, addition_veg)
 
@@ -265,11 +279,6 @@ for ntime in range(int(coupling_ntimeUse)):
         model_dfm.set_var('bl',bl_model)
     except:
         print('no bed level update, model initiation')
-        
-    # find cells that have vegetation
-    index_veg_cel = index_veg_cdveg(xzyz_cell_number, ugrid_all, read_data)
-    # predefine the pandas dataframe of the mangrove positions
-    list_read_subset = list_subsetCdveg(ugrid_all, xzyz_cell_number, index_veg_cel, read_data)
         
     try:
         list_seed2sapl.append(seedling_finalpos)
@@ -463,6 +472,15 @@ for ntime in range(int(coupling_ntimeUse)):
     for ii in range(h_wl.shape[0]):
         fromheightcalc, Pvaluecalc = calcWOO(h_wl[ii,:],woo_inun) # get correlation of elevation and Probability
         surv_val[ii] = np.interp(med_h_wl[ii],fromheightcalc,Pvaluecalc)
+    
+    # check surv_val, lower than LLWL should be 0
+    bed_is = model_dfm.get_var('bl')
+    surv_is = copy.copy(surv_val)
+    for surv in range(len(surv_val)):
+        if bed_is[surv] >= LLWL:
+            surv_val[surv] = surv_is[surv]
+        else:
+            surv_val[surv] = 0
         
     ## Filter seedlings based on the surv_val
     if seedling_finalpos.size > 0:
