@@ -358,4 +358,16 @@ def seedling_prob(sdlg_fnl_pos, xzyz_cell_number, ugrid_all, surv_val):
     seedling_after_woo = seedling_after_woo.reset_index(drop=True)
     return seedling_after_woo
             
+def elim_seeds_surv(sdlg_fnl_pos, xzyz_cell_number, ugrid_all, surv_val):
+    list_of_seeds = []
     
+    for row in range(len(xzyz_cell_number)):
+        surv_val_in_row = surv_val[row]
+        if surv_val_in_row > 0:
+            read_data_subset = subsetting_cellCdveg(ugrid_all, xzyz_cell_number, row, sdlg_fnl_pos)
+            # seeds_not_zero = read_data_subset.copy()
+            list_of_seeds.append(read_data_subset)
+    
+    seedling_after_filter = pd.concat(list_of_seeds, axis=0)
+    seedling_after_filter = seedling_after_filter.reset_index(drop=True)
+    return seedling_after_filter
