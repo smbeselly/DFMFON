@@ -11,17 +11,28 @@ TODO belum nambah script untuk tambahan sediment karena biomass (daun jatuh, dll
 # x1 = datetime.datetime.now()
 # =============================================================================
 #%% Input Folders and Files
-PROJ_HOME = r'D:\Git\d3d_meso'
-SYS_APP = r'D:\Git\d3d_meso/FnD3D'
-D3D_HOME = r'D:\Git\d3d_meso\Model-Execute\D3DFM\oss_artifacts_x64_140691'
-gdal_loc = r'D:\Program_Files\Anaconda3\envs\d3dfm_39\Lib\site-packages\osgeo_utils'
+# PROJ_HOME = r'D:\Git\d3d_meso'
+# SYS_APP = r'D:\Git\d3d_meso/FnD3D'
+# D3D_HOME = r'D:\Git\d3d_meso\Model-Execute\D3DFM\2sebrian_20220518' #sal_veg-OK
+# gdal_loc = r'C:\Users\sbe002\Anaconda3\envs\d3dfm_39\Lib\site-packages\osgeo_utils'
+# JAVA_Exe = r'C:\Users\sbe002\RepastSimphony-2.8\eclipse\jdk11\bin\java.exe'
+# # Mangr_SHP = 'geserMangroveAgeMerged.shp'
+# Mangr_SHP = 'Tip_Saplings_geser_2.shp'
+
+# D3D_Model = 'FunnelMorphMF30_Adjusted_Saline_geser_2'
+# D3D_Domain = 'Grid_Funnel_1_net.nc'
+# MFON_Folder = 'MesoFON_20220506_noSurv'
+
+PROJ_HOME = r'C:\Users\sbe002\Downloads\Research_Run\d3d_meso_run7_scenario_A_test'
+SYS_APP = r'C:\Users\sbe002\Downloads\Research_Run\d3d_meso_run7_scenario_A_test/FnD3D'
+D3D_HOME = r'D:\Git\d3d_meso\Model-Execute\D3DFM\2sebrian_20220518' #sal_veg-OK
+gdal_loc = r'C:\Users\sbe002\Anaconda3\envs\d3dfm_39\Lib\site-packages\osgeo_utils'
 JAVA_Exe = r'C:\Users\sbe002\RepastSimphony-2.8\eclipse\jdk11\bin\java.exe'
-Mangr_SHP = 'geserMangroveAgeMerged.shp'
+Mangr_SHP = 'Tip_Saplings_geser_2.shp'
 
-D3D_Model = 'FunnelMorphMF30_Adjusted_Saline_geser_2'
+D3D_Model = 'd3d_meso_run6_scenario_A'
 D3D_Domain = 'Grid_Funnel_1_net.nc'
-MFON_Folder = 'MesoFON_20220207'
-
+MFON_Folder = 'MesoFON_20220506_noSurv'
 
 ## Check the complete_model.jar file and change this source file
 Sal_Source = r'C:\Users\brian\git\macro_FON_220111\meso_FON\tile_20_20_sal_'
@@ -37,7 +48,8 @@ import numpy.ma as ma
 import sys
 print(sys.path)
 sys.path.append(SYS_APP) # as this Func will be in the same folder, no longer needed
-from d3d_prep_raster import d3dConcaveHull, d3dPolySHP, d3dCSV2ClippedRaster, d3dRaster2Tiles
+from d3d_prep_raster import d3dConcaveHull, d3dPolySHP, d3dCSV2ClippedRaster, d3dRaster2Tiles, D3dNewRaster2Tiles
+# from d3d_meso_mangro import csv2ClippedRaster
 from dfm_tools.get_nc import get_netdata
 from d3d_meso_mangro import calcAgeCoupling0
 import matplotlib.pyplot as plt
@@ -165,6 +177,8 @@ matrix= (np.delete(matrix, np.where(matrix == -999)[0], axis=0))
 matrix = (matrix[~np.isnan(matrix).any(axis=1)])
 
 d3dCSV2ClippedRaster(concave_path, concave_name, EPSG_coord, matrix, x_res, y_res, no_data_val, shp_clip, affix)
+
+# csv2ClippedRaster(concave_path, matrix, concave_name, x_res, y_res, no_data_val, affix, dir_out, EPSG_coord)
 
 #return to home
 os.chdir(PROJ_HOME)

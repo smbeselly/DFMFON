@@ -15,7 +15,7 @@ PROJ_HOME = r'D:\Git\d3d_meso'
 SYS_APP = r'D:\Git\d3d_meso/FnD3D'
 D3D_HOME = r'D:\Git\d3d_meso\Model-Execute\D3DFM\2sebrian_20220518' #sal_veg-OK
 # D3D_HOME = r'D:\Git\d3d_meso\Model-Execute\D3DFM\oss_artifacts_x64_140691' #veg-OK
-gdal_loc = r'D:\Program_Files\Anaconda3\envs\d3dfm_39\Lib\site-packages\osgeo_utils'
+gdal_loc = r'C:\Users\sbe002\Anaconda3\envs\d3dfm_39\Lib\site-packages\osgeo_utils'
 JAVA_Exe = r'C:\Users\sbe002\RepastSimphony-2.8\eclipse\jdk11\bin\java.exe'
 
 D3D_Model = 'model_run_6_flat'
@@ -23,7 +23,8 @@ D3D_Domain = 'Grid_Funnel_20_by_20_net.nc'
 config_xml = 'model_run_6_flat.xml'
 mdu_file = 'FlowFM.mdu'
 
-Mangr_SHP = 'geserMangroveAgeMerged.shp'
+# Mangr_SHP = 'geserMangroveAgeMerged.shp'
+Mangr_SHP = 'Tip_Saplings_geser_2.shp'
 
 #%% Import the packages and set the file
 import numpy as np
