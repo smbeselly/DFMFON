@@ -1757,3 +1757,72 @@ def definePropVeg(xzyz_cell_number, model_dfm, ugrid_all, index_veg_cel, read_da
     stemheight_coeff = np.append(stemheight_coeff, addition_veg)
     
     return rnveg_coeff, diaveg_coeff, stemheight_coeff
+
+def Calc_WoO(water_level, model_dfm, MorFac, coupling_period, woo_inun, LLWL):
+    import copy           
+    ### Calculate the WoO value
+    # calculate the x axis of the array of the default run
+    wl_shape = water_level.shape
+    per_column = model_dfm.get_time_step()*MorFac
+    time_linspace = np.linspace(per_column, coupling_period, wl_shape[1])
+    # get the time step per column
+    value_floor = np.floor(per_column/3600) # get the smaller step to get denser array (in hour)
+    # check whether the value is more than 6 that makes it difficult to have an even array
+    if (value_floor % 2) == 0:
+        value_floor = value_floor
+    elif(value_floor % 2) == 1 and value_floor > 6:
+        value_floor = 6
+    else:
+        value_floor = value_floor
+
+    # create an even x-axis    
+    value_interp = int(coupling_period/3600/value_floor)
+    time_interp = np.linspace(per_column, coupling_period, value_interp)
+
+    # use interp1d to calculate the interpolated water level
+    water_level_interp = np.empty((0, value_interp))
+    for row in range(int(wl_shape[0])):
+        f = interp1d(time_linspace,water_level[row,:])
+        wl = f(time_interp)
+        water_level_interp = np.append(water_level_interp, np.reshape(wl,(1,value_interp)), axis=0)
+
+    col_num = int(24/value_floor) # equal to how many columns represent 1 day
+    col_lookup = int(value_interp/col_num)
+    # find daily maximum water level
+    # wl_shape = water_level.shape
+    h_wl = np.empty((0, col_lookup))
+    # real time in hour is coupling_period/3600
+    bb = np.empty((0, col_lookup))
+
+    for ii in range(int(wl_shape[0])):
+        cc = water_level_interp[ii,:]
+        bb = []
+        for aa in range(col_lookup):
+            # bb_col = np.amax(cc[:,aa*col_num:aa*col_num+col_num])
+            bb_col = np.amax(cc[aa*col_num:aa*col_num+col_num])
+            bb.append(bb_col)
+            # np.concatenate((bb,bb_col))
+        bb = np.array(bb)
+        bb = bb.reshape(1,col_lookup)
+        h_wl = np.append(h_wl,bb,axis=0)
+
+    ### Calculate the probability based on the WoO and store the value in each cell
+    # find median value of the h_wl for each cell number
+    med_h_wl = np.median(h_wl, axis=1) 
+
+    # calculate WoO probability value from h_wl (daily max water level)
+    surv_val = np.empty(len(med_h_wl)) #initiate an empty array
+    for ii in range(h_wl.shape[0]):
+        fromheightcalc, Pvaluecalc = calcWOO(h_wl[ii,:],woo_inun) # get correlation of elevation and Probability
+        surv_val[ii] = np.interp(med_h_wl[ii],fromheightcalc,Pvaluecalc)
+
+    # check surv_val, lower than LLWL should be 0
+    bed_is = model_dfm.get_var('bl')
+    surv_is = copy.copy(surv_val)
+    for surv in range(len(surv_val)):
+        if bed_is[surv] >= LLWL:
+            surv_val[surv] = surv_is[surv]
+        else:
+            surv_val[surv] = 0
+            
+    return med_h_wl, surv_val

@@ -371,3 +371,21 @@ def elim_seeds_surv(sdlg_fnl_pos, xzyz_cell_number, ugrid_all, surv_val):
     seedling_after_filter = pd.concat(list_of_seeds, axis=0)
     seedling_after_filter = seedling_after_filter.reset_index(drop=True)
     return seedling_after_filter
+
+def range_seed(bed_level, limit_seed, LLWL, no_data_val, xz, yz):
+    # get the last column of bed_level
+    bed_level_last = bed_level[:,-1]
+    bed_level = np.where(bed_level_last < LLWL, no_data_val, bed_level_last) # less than LLWL will be -999
+    # arrange the xyz
+    bed_level_val_raster = np.column_stack((xz,yz,bed_level))
+    ## check and filter the bed level if it is within range that you want
+    # filter x value between range x from bed_level_raster
+    bed_level_check = bed_level_val_raster[ (limit_seed[0] <= bed_level_val_raster[:,0]) 
+                                           & (bed_level_val_raster[:,0] <= limit_seed[1]) ] 
+    # filter y value between range y from bed_level_check
+    bed_level_check = bed_level_check[ (limit_seed[2] <= bed_level_check[:,1]) 
+                                      & (bed_level_check[:,1] <= limit_seed[3])]                       
+    # filter array for no_data_val
+    bed_level_check = bed_level_check[bed_level_check[:,2] != no_data_val]                                                                      
+    
+    return bed_level_check
