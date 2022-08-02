@@ -5,6 +5,8 @@ Created on Thu Jan  6 19:05:21 2022
 @author: sbe002
 
 TODO belum nambah script untuk tambahan sediment karena biomass (daun jatuh, dll)
+
+Test dengan model B2
 """
 # =============================================================================
 # import datetime
@@ -23,16 +25,16 @@ TODO belum nambah script untuk tambahan sediment karena biomass (daun jatuh, dll
 # D3D_Domain = 'Grid_Funnel_1_net.nc'
 # MFON_Folder = 'MesoFON_20220506_noSurv'
 
-PROJ_HOME = r'C:\Users\sbe002\Downloads\Research_Run\d3d_meso_run7_scenario_A_test'
+PROJ_HOME = r'C:\Users\sbe002\Downloads\Research_Run\d3d_meso_run9_scenario_B2_nat_est'
 SYS_APP = r'D:\Git\d3d_meso/FnD3D'
 D3D_HOME = r'D:\Git\d3d_meso\Model-Execute\D3DFM\2sebrian_20220518' #sal_veg-OK
 gdal_loc = r'C:\Users\sbe002\Anaconda3\envs\d3dfm_39\Lib\site-packages\osgeo_utils'
 JAVA_Exe = r'C:\Users\sbe002\RepastSimphony-2.8\eclipse\jdk11\bin\java.exe'
 # Mangr_SHP = 'Tip_Saplings_geser_2.shp' # tidak perlu karena akan randomly generated
 
-D3D_Model = 'd3d_meso_run6_scenario_A'
-D3D_Domain = 'Grid_Funnel_1_net.nc'
-config_xml = 'd3d_meso_run6.xml'
+D3D_Model = 'd3d_meso_run9_scenario_B2'
+D3D_Domain = 'Grid_Funnel_20_by_20_crest-1.5_net.nc'
+config_xml = 'd3d_meso_run9.xml'
 mdu_file = 'FlowFM.mdu'
 MFON_Folder = 'MesoFON_20220506_noSurv'
 
@@ -93,6 +95,7 @@ import re
 from dateutil import parser
 import datetime
 import copy
+from dateutil.rrule import rrule, MONTHLY
 
 ## Set the paths for dll-files and input-files for DFM
 PROJ_HOME = os.path.join(PROJ_HOME)
@@ -844,6 +847,12 @@ Surv_Source = Sal_Source
 Excel_Source = Sal_Source
 
 coupling_ntime_run = coupling_ntimeUse - coupling_ntime_is - coupling_ntime_after_seeds
+
+# add_seeds_age = add_seeds_age = datetime.timedelta(days = 0) # for seeds age initiation
+# seedling_finalpos = copy.copy(seeds_pd_filt) # to store the previously created seedlings for calculation
+# seedling_finalpos['Age'] = pd.to_timedelta(730, unit='D')
+list_seed2sapl = []
+
 # current_coupling_time        
 for ntime in range(int(coupling_ntime_run)):
     ntime += current_coupling_time+1
@@ -930,6 +939,13 @@ for ntime in range(int(coupling_ntime_run)):
     #initiating empty array for residual current calculation
     res_x = np.empty((len(xz),0))
     res_y = np.empty((len(xz),0))   
+    
+    ## test new January checking
+    cur_date = refdatet+cursecMF
+    nxt_secMF = cursecMF + datetime.timedelta(seconds=(coupling_period_model*MorFac)) #get date after coupling
+    nxt_date = refdatet + nxt_secMF
+    
+    chk_seed_prod = [dayis.month for dayis in rrule(MONTHLY, dtstart=cur_date, until=nxt_date)]
 
     timeisnow = datetime.datetime.now()   
     t=0 # since the time step in DFM is flexible, therefore use this approach.
@@ -945,13 +961,21 @@ for ntime in range(int(coupling_ntime_run)):
         if curmonth == '01' and curyr_check == 0:
             print('prepare for seedlings establishment')
             res_x, res_y = collect_res( model_dfm, res_x, res_y)
-                 
+        
         elif curyr_check != 0:
-            if curmonth == '01' and curyr != curyr_check:
+            if 1 in chk_seed_prod:
                 print('prepare for seedlings establishment')
                 res_x, res_y = collect_res( model_dfm, res_x, res_y)
             else:
                 print(curyr, '/', curmonth, 'no seedlings establishment')
+
+     
+        # elif curyr_check != 0:
+        #     if curmonth == '01' and curyr != curyr_check:
+        #         print('prepare for seedlings establishment')
+        #         res_x, res_y = collect_res( model_dfm, res_x, res_y)
+        #     else:
+        #         print(curyr, '/', curmonth, 'no seedlings establishment')
         
         dts = model_dfm.get_time_step()
         t=t+dts
@@ -1002,9 +1026,9 @@ for ntime in range(int(coupling_ntime_run)):
         bool_series = seedling_finalpos.duplicated(keep='first')
         seedling_finalpos = seedling_finalpos[~bool_series]
         
-        seedling_finalpos.to_csv(os.path.join(seedlings_out, 
-                                'Seedling_Coupling_'+str(ntime+1)+'.txt'), 
-                                 sep=',', index=False, header=True)
+        # seedling_finalpos.to_csv(os.path.join(seedlings_out, 
+        #                         'Seedling_Coupling_'+str(ntime+1)+'.txt'), 
+        #                           sep=',', index=False, header=True)
 
     else:
         print(curyr, '/', curmonth, 'no seedlings establishment')
@@ -1083,7 +1107,12 @@ for ntime in range(int(coupling_ntime_run)):
             seedling_finalpos_2 = seedling_prob(seedling_finalpos, xzyz_cell_number,
                                         ugrid_all, surv_val)
             seedling_finalpos_filt = elim_seeds_surv(seedling_finalpos_2, xzyz_cell_number, ugrid_all, surv_val)
-            seedling__finalpos = copy.copy(seedling_finalpos_filt)
+            seedling_finalpos = copy.copy(seedling_finalpos_filt)
+            
+            seedling_finalpos.to_csv(os.path.join(seedlings_out, 
+                                    'Seedling_Coupling_'+str(ntime+1)+'.txt'), 
+                                      sep=',', index=False, header=True)
+            
     except:
         print('No seedlings establishment')
             
@@ -1254,6 +1283,8 @@ for ntime in range(int(coupling_ntime_run)):
     print('End of coupling',str(ntime+1))
     print('Date now with MF is', ((refdatet+cursecMF).strftime('%Y%m%d %HH:%MM:%SS'))) 
     print('Runtime', 'End of coupling ',str(ntime+1), 'is', timeislast-timeisnow)
+    
+    add_seeds_age = datetime.timedelta(days = coupling_period / (24*3600)) # to add age for the next iteration
     
 ### End Loop
 #Finalize the running

@@ -70,6 +70,7 @@ from scipy.interpolate import interp1d
 from dateutil import parser
 import datetime
 import copy
+from dateutil.rrule import rrule, MONTHLY
 
 ## Set the paths for dll-files and input-files for DFM
 PROJ_HOME = os.path.join(PROJ_HOME)
@@ -335,6 +336,13 @@ for ntime in range(int(coupling_ntimeUse)):
     #initiating empty array for residual current calculation
     res_x = np.empty((len(xz),0))
     res_y = np.empty((len(xz),0))   
+    
+    ## test new January checking
+    cur_date = refdatet+cursecMF
+    nxt_secMF = cursecMF + datetime.timedelta(seconds=(coupling_period_model*MorFac)) #get date after coupling
+    nxt_date = refdatet + nxt_secMF
+    
+    chk_seed_prod = [dayis.month for dayis in rrule(MONTHLY, dtstart=cur_date, until=nxt_date)]
 
     timeisnow = datetime.datetime.now()   
     t=0 # since the time step in DFM is flexible, therefore use this approach.
@@ -350,13 +358,21 @@ for ntime in range(int(coupling_ntimeUse)):
         if curmonth == '01' and curyr_check == 0:
             print('prepare for seedlings establishment')
             res_x, res_y = collect_res( model_dfm, res_x, res_y)
-                 
+        
         elif curyr_check != 0:
-            if curmonth == '01' and curyr != curyr_check:
+            if 1 in chk_seed_prod:
                 print('prepare for seedlings establishment')
                 res_x, res_y = collect_res( model_dfm, res_x, res_y)
             else:
                 print(curyr, '/', curmonth, 'no seedlings establishment')
+
+     
+        # elif curyr_check != 0:
+        #     if curmonth == '01' and curyr != curyr_check:
+        #         print('prepare for seedlings establishment')
+        #         res_x, res_y = collect_res( model_dfm, res_x, res_y)
+        #     else:
+        #         print(curyr, '/', curmonth, 'no seedlings establishment')
         
         dts = model_dfm.get_time_step()
         t=t+dts
@@ -407,9 +423,9 @@ for ntime in range(int(coupling_ntimeUse)):
         bool_series = seedling_finalpos.duplicated(keep='first')
         seedling_finalpos = seedling_finalpos[~bool_series]
         
-        seedling_finalpos.to_csv(os.path.join(seedlings_out, 
-                                'Seedling_Coupling_'+str(ntime+1)+'.txt'), 
-                                 sep=',', index=False, header=True)
+        # seedling_finalpos.to_csv(os.path.join(seedlings_out, 
+        #                         'Seedling_Coupling_'+str(ntime+1)+'.txt'), 
+        #                          sep=',', index=False, header=True)
 
     else:
         print(curyr, '/', curmonth, 'no seedlings establishment')
@@ -488,6 +504,10 @@ for ntime in range(int(coupling_ntimeUse)):
                                             ugrid_all, surv_val)
         seedling_finalpos_filt = elim_seeds_surv(seedling_finalpos_2, xzyz_cell_number, ugrid_all, surv_val)
         seedling_finalpos = seedling_finalpos_filt
+        
+        seedling_finalpos.to_csv(os.path.join(seedlings_out, 
+                                'Seedling_Coupling_'+str(ntime+1)+'.txt'), 
+                                 sep=',', index=False, header=True)
     
     ### 4. Convert from data point to raster environment 
     # 4.1 Create raster from the surv-val
