@@ -11,19 +11,23 @@ This is the script for model include salinity and include seedlings establishmen
 # Don't forget to %reset %clear
 
 #%% Input Folders and Files
-PROJ_HOME = r'D:\Git\d3d_meso'
+PROJ_HOME = r'C:\Users\sbe002\Downloads\Research_Run\d3d_meso_run7_scenario_A'
+# PROJ_HOME = r'D:\Git\d3d_meso'
 SYS_APP = r'D:\Git\d3d_meso/FnD3D'
 D3D_HOME = r'D:\Git\d3d_meso\Model-Execute\D3DFM\2sebrian_20220518' #sal_veg-OK
 gdal_loc = r'C:\Users\sbe002\Anaconda3\envs\d3dfm_39\Lib\site-packages\osgeo_utils'
 JAVA_Exe = r'C:\Users\sbe002\RepastSimphony-2.8\eclipse\jdk11\bin\java.exe'
 
-D3D_Model = 'model_run_6_flat'
-D3D_Domain = 'Grid_Funnel_20_by_20_net.nc'
-config_xml = 'model_run_6_flat.xml'
+D3D_Model = 'd3d_meso_run6_scenario_A'
+D3D_Domain = 'Grid_Funnel_1_net.nc'
+config_xml = 'd3d_meso_run6.xml'
+# D3D_Model = 'model_run_6_flat'
+# D3D_Domain = 'Grid_Funnel_20_by_20_net.nc'
+# config_xml = 'model_run_6_flat.xml'
 mdu_file = 'FlowFM.mdu'
 
-# Mangr_SHP = 'geserMangroveAgeMerged.shp'
-Mangr_SHP = 'Tip_Saplings_geser_2_arah_y.shp'
+Mangr_SHP = 'Tip_Saplings_geser_2.shp'
+# Mangr_SHP = 'Tip_Saplings_geser_2_arah_y.shp'
 
 #%% Import the packages and set the file
 import numpy as np
@@ -71,6 +75,24 @@ from dateutil import parser
 import datetime
 import copy
 from dateutil.rrule import rrule, MONTHLY
+
+# to log the print to  : https://stackoverflow.com/questions/14906764/how-to-redirect-stdout-to-both-file-and-console-with-scripting
+class Logger(object):
+    def __init__(self):
+        self.terminal = sys.stdout
+        self.log = open("logfile_02.log", "a")
+   
+    def write(self, message):
+        self.terminal.write(message)
+        self.log.write(message)  
+
+    def flush(self):
+        # this flush method is needed for python 3 compatibility.
+        # this handles the flush command by doing nothing.
+        # you might want to specify some extra behavior here.
+        pass    
+
+sys.stdout = Logger()
 
 ## Set the paths for dll-files and input-files for DFM
 PROJ_HOME = os.path.join(PROJ_HOME)

@@ -23,8 +23,8 @@ TODO belum nambah script untuk tambahan sediment karena biomass (daun jatuh, dll
 # D3D_Domain = 'Grid_Funnel_1_net.nc'
 # MFON_Folder = 'MesoFON_20220506_noSurv'
 
-PROJ_HOME = r'C:\Users\sbe002\Downloads\Research_Run\d3d_meso_run7_scenario_A_test'
-SYS_APP = r'C:\Users\sbe002\Downloads\Research_Run\d3d_meso_run7_scenario_A_test/FnD3D'
+PROJ_HOME = r'C:\Users\sbe002\Downloads\Research_Run\d3d_meso_run7_scenario_A'
+SYS_APP = r'D:\Git\d3d_meso\FnD3D'
 D3D_HOME = r'D:\Git\d3d_meso\Model-Execute\D3DFM\2sebrian_20220518' #sal_veg-OK
 gdal_loc = r'C:\Users\sbe002\Anaconda3\envs\d3dfm_39\Lib\site-packages\osgeo_utils'
 JAVA_Exe = r'C:\Users\sbe002\RepastSimphony-2.8\eclipse\jdk11\bin\java.exe'
@@ -48,7 +48,7 @@ import numpy.ma as ma
 import sys
 print(sys.path)
 sys.path.append(SYS_APP) # as this Func will be in the same folder, no longer needed
-from d3d_prep_raster import d3dConcaveHull, d3dPolySHP, d3dCSV2ClippedRaster, d3dRaster2Tiles, D3dNewRaster2Tiles
+from d3d_prep_raster import d3dConcaveHull, d3dPolySHP, d3dCSV2ClippedRaster, d3dRaster2Tiles#, D3dNewRaster2Tiles
 # from d3d_meso_mangro import csv2ClippedRaster
 from dfm_tools.get_nc import get_netdata
 from d3d_meso_mangro import calcAgeCoupling0
@@ -73,6 +73,24 @@ import send2trash
 import sys
 import fileinput
 import re
+
+# to log the print to file : https://stackoverflow.com/questions/14906764/how-to-redirect-stdout-to-both-file-and-console-with-scripting
+class Logger(object):
+    def __init__(self):
+        self.terminal = sys.stdout
+        self.log = open("logfile_01.log", "a")
+   
+    def write(self, message):
+        self.terminal.write(message)
+        self.log.write(message)  
+
+    def flush(self):
+        # this flush method is needed for python 3 compatibility.
+        # this handles the flush command by doing nothing.
+        # you might want to specify some extra behavior here.
+        pass    
+
+sys.stdout = Logger()
 
 ## Set the paths for dll-files and input-files for DFM
 PROJ_HOME = os.path.join(PROJ_HOME)
