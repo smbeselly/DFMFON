@@ -11,7 +11,7 @@ This is the script for model include salinity and include seedlings establishmen
 # Don't forget to %reset %clear
 
 #%% Input Folders and Files
-PROJ_HOME = r'C:\Users\sbe002\Downloads\Research_Run\d3d_meso_run7_scenario_A'
+PROJ_HOME = r'C:\Users\sbe002\Downloads\Research_Run\Model_A_test_scheduling'
 # PROJ_HOME = r'D:\Git\d3d_meso'
 SYS_APP = r'D:\Git\d3d_meso/FnD3D'
 D3D_HOME = r'D:\Git\d3d_meso\Model-Execute\D3DFM\2sebrian_20220518' #sal_veg-OK
@@ -74,13 +74,13 @@ from scipy.interpolate import interp1d
 from dateutil import parser
 import datetime
 import copy
-from dateutil.rrule import rrule, MONTHLY
+from dateutil.rrule import rrule, MONTHLY, DAILY
 
 # to log the print to  : https://stackoverflow.com/questions/14906764/how-to-redirect-stdout-to-both-file-and-console-with-scripting
 class Logger(object):
     def __init__(self):
         self.terminal = sys.stdout
-        self.log = open("logfile_02.log", "a")
+        self.log = open("logfile_02_seedling.log", "a")
    
     def write(self, message):
         self.terminal.write(message)
@@ -118,6 +118,12 @@ if not os.path.exists(figsavefolder):
 seedlings_out = os.path.join(PROJ_HOME,'Model-Out','MesoFON', 'Seedlings')
 if not os.path.exists(seedlings_out):
     os.makedirs(seedlings_out)
+saplings_out = os.path.join(PROJ_HOME,'Model-Out','MesoFON', 'Saplings')
+if not os.path.exists(saplings_out):
+    os.makedirs(saplings_out)
+seedlngs_w_age_out = os.path.join(PROJ_HOME,'Model-Out','MesoFON', 'Seedlings_with_age')
+if not os.path.exists(seedlngs_w_age_out):
+    os.makedirs(seedlngs_w_age_out)
 botdepth_out = os.path.join(DFM_OUT, 'Bottom_Depth')
 if not os.path.exists(botdepth_out):
     os.makedirs(botdepth_out)
@@ -305,9 +311,13 @@ for ntime in range(int(coupling_ntimeUse)):
         
     try:
         list_seed2sapl.append(seedling_finalpos)
+        seedling_finalpos = pd.DataFrame() # to make sure no seedlings are fed when it is not the season
         seed2sapl = pd.concat(list_seed2sapl, axis=0)
         # add age to the appended pandas
         seed2sapl['Age'] = seed2sapl['Age']+add_seeds_age
+        seed2sapl.to_csv(os.path.join(seedlngs_w_age_out, 
+                                'Seedling_with_age_Coupling_'+str(ntime+1)+'.txt'), 
+                                  sep=',', index=False, header=True)
         
         list_seed2sapl = []
         list_seed2sapl.append(seed2sapl)
@@ -339,6 +349,10 @@ for ntime in range(int(coupling_ntimeUse)):
             
             print('Total number of saplings:', now_as_saplings.shape[0])
             
+            now_as_saplings.to_csv(os.path.join(saplings_out, 
+                                    'Saplings_Coupling_'+str(ntime+1)+'.txt'), 
+                                      sep=',', index=False, header=True)
+            
         else:
             print("The seedlings' age is less than 2 years")
     except:
@@ -365,6 +379,16 @@ for ntime in range(int(coupling_ntimeUse)):
     nxt_date = refdatet + nxt_secMF
     
     chk_seed_prod = [dayis.month for dayis in rrule(MONTHLY, dtstart=cur_date, until=nxt_date)]
+    
+    ## Control for Duplicate Month of January (when it leaps)
+    def chck_full_jan():
+        the_list = list(rrule(DAILY, dtstart=cur_date, until=nxt_date))
+        day_counts = {}
+        for day in the_list:
+            day_counts[day.month] = day_counts.get(day.month, 0)+1
+        return day_counts    
+
+    day_counts = chck_full_jan()    
 
     timeisnow = datetime.datetime.now()   
     t=0 # since the time step in DFM is flexible, therefore use this approach.
@@ -382,10 +406,16 @@ for ntime in range(int(coupling_ntimeUse)):
             res_x, res_y = collect_res( model_dfm, res_x, res_y)
         
         elif curyr_check != 0:
-            if 1 in chk_seed_prod:
-                print('prepare for seedlings establishment')
-                res_x, res_y = collect_res( model_dfm, res_x, res_y)
-            else:
+            try:
+                if day_counts[1] < 16 and curyr != curyr_check:
+                    print(curyr, '/', curmonth, 'no seedlings establishment \ndoes not satisfy min num of days') ## indicates that January days are not enough
+                elif day_counts[1] < 16 and curyr == curyr_check:
+                    print(curyr, '/', curmonth, 'no seedlings establishment \ndoes not satisfy min num of days') ## indicates that seedlings have been established in previous coupling
+                elif day_counts[1] >= 16:
+                    if 1 in chk_seed_prod and curmonth == '01':
+                        print('prepare for seedlings establishment')
+                        res_x, res_y = collect_res( model_dfm, res_x, res_y)              
+            except:
                 print(curyr, '/', curmonth, 'no seedlings establishment')
 
      
@@ -521,6 +551,8 @@ for ntime in range(int(coupling_ntimeUse)):
             surv_val[surv] = 0
         
     ## Filter seedlings based on the surv_val
+    # if len(residual_is) != 0:
+    # try:
     if seedling_finalpos.size > 0:
         seedling_finalpos_2 = seedling_prob(seedling_finalpos, xzyz_cell_number, 
                                             ugrid_all, surv_val)
@@ -530,6 +562,8 @@ for ntime in range(int(coupling_ntimeUse)):
         seedling_finalpos.to_csv(os.path.join(seedlings_out, 
                                 'Seedling_Coupling_'+str(ntime+1)+'.txt'), 
                                  sep=',', index=False, header=True)
+    # except:
+    #     print('')
     
     ### 4. Convert from data point to raster environment 
     # 4.1 Create raster from the surv-val
@@ -698,7 +732,7 @@ for ntime in range(int(coupling_ntimeUse)):
     print('End of coupling',str(ntime+1))
     print('Date now with MF is', ((refdatet+cursecMF).strftime('%Y%m%d %HH:%MM:%SS'))) 
     print('Runtime', 'End of coupling ',str(ntime+1), 'is', timeislast-timeisnow)
-    
+   
 ### End Loop
 #Finalize the running
 model_dimr.finalize()   

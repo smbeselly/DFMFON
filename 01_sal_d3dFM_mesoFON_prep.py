@@ -23,7 +23,7 @@ TODO belum nambah script untuk tambahan sediment karena biomass (daun jatuh, dll
 # D3D_Domain = 'Grid_Funnel_1_net.nc'
 # MFON_Folder = 'MesoFON_20220506_noSurv'
 
-PROJ_HOME = r'C:\Users\sbe002\Downloads\Research_Run\d3d_meso_run7_scenario_A'
+PROJ_HOME = r'C:\Users\sbe002\Downloads\Research_Run\Model_A_test_scheduling'
 SYS_APP = r'D:\Git\d3d_meso\FnD3D'
 D3D_HOME = r'D:\Git\d3d_meso\Model-Execute\D3DFM\2sebrian_20220518' #sal_veg-OK
 gdal_loc = r'C:\Users\sbe002\Anaconda3\envs\d3dfm_39\Lib\site-packages\osgeo_utils'
@@ -78,7 +78,7 @@ import re
 class Logger(object):
     def __init__(self):
         self.terminal = sys.stdout
-        self.log = open("logfile_01.log", "a")
+        self.log = open("logfile_01_prep.log", "a")
    
     def write(self, message):
         self.terminal.write(message)
