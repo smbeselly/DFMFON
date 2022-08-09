@@ -175,6 +175,7 @@ MorFac = 30
 woo_inun = 3 # inundation free period (days)
 no_data_val = -999.0
 limit_seed = [706574,707031,9163156,9163511] # [xmin, xmax, ymin, ymax] the area allowed for seedlings development
+target_seed = 362 # initial seedlings number as in 02_sal_new
 
 #%% Import the nc file, create hull, and build poly
 nc_in = netcdf_domain
@@ -456,9 +457,25 @@ def poly_rand_pts(poly, num_points):
 ## define random seedlings position
 # find number of seedlings per area: 0.03/m^2 as in Porong
 # area_seed = get_poly_area(poly_seed, EPSG_Project)
+# =============================================================================
+## This is the seedlings production for full area.
+# area_seed = poly_seed.area
+# seeds_are = round(area_seed*0.03) 
+# seeds_pt = poly_rand_pts(poly_seed,seeds_are)
+# =============================================================================
+## Seedling Area with Scaling
+from shapely import affinity
 area_seed = poly_seed.area
 seeds_are = round(area_seed*0.03) 
-seeds_pt = poly_rand_pts(poly_seed,seeds_are)
+scaling_is = (target_seed/ seeds_are)*3 # to make the area for seedlings larger
+
+scaled_poly_seed = affinity.scale(poly_seed, xfact=scaling_is, yfact=scaling_is, 
+                                  origin=('centroid'))
+# poly_shift_x = poly_seed.bounds[0] - poly_seed.centroid.x
+poly_shift_x = poly_seed.bounds[0] - scaled_poly_seed.bounds[0]
+scld_shift_poly_seed = affinity.translate(scaled_poly_seed, xoff = poly_shift_x)
+
+seeds_pt = poly_rand_pts(scld_shift_poly_seed,target_seed)
 
 xv = np.array([point.x for point in seeds_pt])
 yv = np.array([point.y for point in seeds_pt])
@@ -468,6 +485,16 @@ yv = np.array([point.y for point in seeds_pt])
 # p = gpd.GeoSeries(poly_seed)
 # p.plot()
 # plt.scatter(xv,yv, c='red')
+
+# fig, ax = plt.subplots()
+# x, y = poly_seed.exterior.xy
+# x_sc, y_sc = scaled_poly_seed.exterior.xy
+# x_sc_sft, y_sc_sft = scld_shift_poly_seed.exterior.xy
+
+# plt.fill(x, y, c="red", alpha=0.5)
+# plt.fill(x_sc, y_sc, c="blue", alpha=0.5)
+# plt.fill(x_sc_sft, y_sc_sft, c="yellow", alpha=0.5)
+# plt.scatter(xv,yv, c='black')
 # =============================================================================
 
 ### Calculate the WoO value
@@ -1151,18 +1178,18 @@ for ntime in range(int(coupling_ntime_run)):
         
     ## Filter seedlings based on the surv_val
     # if len(residual_is) != 0:
-    # try:
-    if seedling_finalpos.size > 0:
-        seedling_finalpos_2 = seedling_prob(seedling_finalpos, xzyz_cell_number, 
-                                            ugrid_all, surv_val)
-        seedling_finalpos_filt = elim_seeds_surv(seedling_finalpos_2, xzyz_cell_number, ugrid_all, surv_val)
-        seedling_finalpos = seedling_finalpos_filt
-        
-        seedling_finalpos.to_csv(os.path.join(seedlings_out, 
-                                'Seedling_Coupling_'+str(ntime+1)+'.txt'), 
-                                 sep=',', index=False, header=True)
-    # except:
-    #     print('')
+    try:
+        if seedling_finalpos.size > 0:
+            seedling_finalpos_2 = seedling_prob(seedling_finalpos, xzyz_cell_number, 
+                                                ugrid_all, surv_val)
+            seedling_finalpos_filt = elim_seeds_surv(seedling_finalpos_2, xzyz_cell_number, ugrid_all, surv_val)
+            seedling_finalpos = seedling_finalpos_filt
+            
+            seedling_finalpos.to_csv(os.path.join(seedlings_out, 
+                                    'Seedling_Coupling_'+str(ntime+1)+'.txt'), 
+                                     sep=',', index=False, header=True)
+    except:
+        print('no seedlings establishment')
             
     ### 4. Convert from data point to raster environment 
     # 4.1 Create raster from the surv-val

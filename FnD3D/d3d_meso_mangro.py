@@ -870,9 +870,12 @@ def Sald3dNewRaster2Tiles(ras_clip, out_path, tile_size_x, tile_size_y, dir_out,
             else:
                 # below is to delete the grid with all nodata value
                 # del(dss,bands,statss)
-                prep_del = prep_out
-                del(prep_out)
-                os.remove(str(prep_del))
+                try:
+                    prep_del = prep_out
+                    del(prep_out)
+                    os.remove(str(prep_del))
+                except:
+                    pass
                 
 def clipSHPcreateXLSfromGPD(file_tile, save_tiled_trees, shp_source, species_name, a0, b0, a137, b137):
     """Clip the Master Trees and Create XLS from the GPD read
