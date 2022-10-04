@@ -2,7 +2,7 @@
 """
 Created on Thu Apr 21 11:54:29 2022
 
-This is the script to have a restart model
+This is the script to have a restart model for 02_sal_new_seedling
 
 @author: sbe002
 """
