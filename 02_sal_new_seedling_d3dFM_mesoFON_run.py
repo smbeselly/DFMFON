@@ -216,6 +216,7 @@ master_trees = gpd.read_file(os.path.join(MFON_Trees, 'Master-Trees', Mangr_SHP)
 MFON_OUT_compile = os.path.join(MFON_OUT,'Compile')
 
 read_data = pd.read_csv(os.path.join(MFON_OUT_compile,'Coupling_0.txt'))
+read_data['plant_id'] = 'coupling_0_'+read_data.index.astype(str)
 
 # use spatial in scipy to match the x,y of the mangroves and the age information.
 # age_coupling0 = calcAgeCoupling0(read_data, master_trees)
@@ -350,7 +351,7 @@ for ntime in range(int(coupling_ntimeUse)):
             print('Total number of saplings:', now_as_saplings.shape[0])
             
             now_as_saplings.to_csv(os.path.join(saplings_out, 
-                                    'Saplings_Coupling_'+str(ntime+1)+'.txt'), 
+                                    'Saplings_Coupling_{}'.format(ntime+1)+'.txt'), 
                                       sep=',', index=False, header=True)
             
         else:
@@ -378,7 +379,8 @@ for ntime in range(int(coupling_ntimeUse)):
     nxt_secMF = cursecMF + datetime.timedelta(seconds=(coupling_period_model*MorFac)) #get date after coupling
     nxt_date = refdatet + nxt_secMF
     
-    chk_seed_prod = [dayis.month for dayis in rrule(MONTHLY, dtstart=cur_date, until=nxt_date)]
+    chk_seed_prod = [dayis.month for dayis in rrule(DAILY, dtstart=cur_date, until=nxt_date)]
+    chk_seed_prod = list(set(chk_seed_prod))
     
     ## Control for Duplicate Month of January (when it leaps)
     def chck_full_jan():
@@ -560,7 +562,7 @@ for ntime in range(int(coupling_ntimeUse)):
         seedling_finalpos = seedling_finalpos_filt
         
         seedling_finalpos.to_csv(os.path.join(seedlings_out, 
-                                'Seedling_Coupling_'+str(ntime+1)+'.txt'), 
+                                'Seedling_Coupling_{}_{}'.format(ntime+1,curyr)+'.txt'), 
                                  sep=',', index=False, header=True)
     # except:
     #     print('')
@@ -710,11 +712,13 @@ for ntime in range(int(coupling_ntimeUse)):
     Concat_table['Age'] = age_coupling #update age after MesoFON run
     Concat_table.drop(['tick'], inplace=True, axis=1)
     Concat_table = Concat_table.reset_index(drop=True) # reset the index
+    Concat_table['plant_id'] = 'coupling_{}_'.format(ntime+1)+read_data.index.astype(str)
     
     # 12.3. Concatenated table is saved as txt file
     Concat_table.to_csv(os.path.join(MFON_OUT_compile, run_is+'.txt'), sep=',', index=False, header=True)
     # save bottom depth as text to facilitate the ongoing simulation visualisation 
     np.savetxt(os.path.join(botdepth_out, run_is+'.txt'), model_dfm.get_var('bl'), delimiter=",")
+    
     
     ### 13. Read the compile txt file to prepare for the next iteration
     read_data = Concat_table  
@@ -732,6 +736,38 @@ for ntime in range(int(coupling_ntimeUse)):
     print('End of coupling',str(ntime+1))
     print('Date now with MF is', ((refdatet+cursecMF).strftime('%Y%m%d %HH:%MM:%SS'))) 
     print('Runtime', 'End of coupling ',str(ntime+1), 'is', timeislast-timeisnow)
+    
+    # 12.4 Read Canopy Out, Compile, and Save as txt
+    namac=[] #empty list for initializing the namae
+    for filepatg in glob.iglob(os.path.join(MFON_HOME, 'tile_*')):
+        nama = []
+        for name in glob.iglob(os.path.join(filepatg, 'instance_1','MF_Canopy_*.txt')):
+            nama.append(name)
+        nama = list(filter(lambda x: not re.search('batch_param_map', x), nama)) # exclude batch_param.txt
+        MFON_OUT_tile = os.path.join(MFON_OUT,Path(filepatg).stem)
+        if not os.path.exists(MFON_OUT_tile):
+            os.makedirs(MFON_OUT_tile)
+        # select the MFON_Trees only and paste it to the MesoFON_Out
+        if nama != []:
+            shutil.copyfile(nama[0], 
+                            os.path.join(MFON_OUT_tile,Path(nama[0]).stem + ' Coupling_0.txt'))
+            namac.append(nama[0])
+
+    ### Compile the results to compile canopy folder
+    MFON_OUT_compile_can = os.path.join(MFON_OUT,'Compile_Canopy')
+    if not os.path.exists(MFON_OUT_compile_can):
+        os.makedirs(MFON_OUT_compile_can)
+
+    all_dfc = []    
+    for nama_a in namac:
+        df = pd.read_csv(nama_a)
+        all_dfc.append(df)
+
+    Concat_tablec = pd.concat(all_dfc)
+    Concat_tablec = Concat_tablec.reset_index(drop=True) # reset the index
+    # Concatenated table is saved as txt file
+    Concat_tablec.to_csv(os.path.join(MFON_OUT_compile_can,run_is+'.txt'), 
+                        sep=',', index=False, header=True)
    
 ### End Loop
 #Finalize the running

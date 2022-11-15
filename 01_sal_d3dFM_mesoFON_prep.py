@@ -498,3 +498,32 @@ Concat_table = Concat_table.reset_index(drop=True) # reset the index
 # Concatenated table is saved as txt file
 Concat_table.to_csv(os.path.join(MFON_OUT_compile,run_is+'.txt'), sep=',', index=False, header=True)
 
+### retrieving canopy out to the MesoFON Model-Out
+namac=[] #empty list for initializing the namae
+for filepatg in glob.iglob(os.path.join(MFON_HOME, 'tile_*')):
+    nama = []
+    for name in glob.iglob(os.path.join(filepatg, 'instance_1','MF_Canopy_*.txt')):
+        nama.append(name)
+    nama = list(filter(lambda x: not re.search('batch_param_map', x), nama)) # exclude batch_param.txt
+    MFON_OUT_tile = os.path.join(MFON_OUT,Path(filepatg).stem)
+    if not os.path.exists(MFON_OUT_tile):
+        os.makedirs(MFON_OUT_tile)
+    # select the MFON_Trees only and paste it to the MesoFON_Out
+    if nama != []:
+        shutil.copyfile(nama[0], os.path.join(MFON_OUT_tile,Path(nama[0]).stem + ' Coupling_0.txt'))
+        namac.append(nama[0])
+
+### Compile the results to compile folder
+MFON_OUT_compile_can = os.path.join(MFON_OUT,'Compile_Canopy')
+if not os.path.exists(MFON_OUT_compile_can):
+    os.makedirs(MFON_OUT_compile_can)
+
+all_dfc = []    
+for nama_a in namac:
+    df = pd.read_csv(nama_a)
+    all_dfc.append(df)
+
+Concat_tablec = pd.concat(all_dfc)
+Concat_tablec = Concat_table.reset_index(drop=True) # reset the index
+# Concatenated table is saved as txt file
+Concat_tablec.to_csv(os.path.join(MFON_OUT_compile_can,run_is+'.txt'), sep=',', index=False, header=True)

@@ -1004,7 +1004,8 @@ for ntime in range(int(coupling_ntime_run)):
     nxt_secMF = cursecMF + datetime.timedelta(seconds=(coupling_period_model*MorFac)) #get date after coupling
     nxt_date = refdatet + nxt_secMF
     
-    chk_seed_prod = [dayis.month for dayis in rrule(MONTHLY, dtstart=cur_date, until=nxt_date)]
+    chk_seed_prod = [dayis.month for dayis in rrule(DAILY, dtstart=cur_date, until=nxt_date)]
+    chk_seed_prod = list(set(chk_seed_prod))
     
     ## Control for Duplicate Month of January (when it leaps)
     def chck_full_jan():
