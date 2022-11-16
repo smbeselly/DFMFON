@@ -136,7 +136,7 @@ def nn_drift_seed(data_n, residual,ts, n_point, row): #assume residual current i
     finalPosY = []
     data_n = data_n.reset_index(drop=True)
     
-    plant_id = data_n['plant_id'][n_point]
+    # plant_id = data_n['plant_id'][n_point]
     ran_radius = data_n['CrownSurfaceArea_m2'][n_point]
     pos_x = data_n['GeoRefPosX'][n_point]
     pos_y = data_n['GeoRefPosY'][n_point]
@@ -153,8 +153,8 @@ def nn_drift_seed(data_n, residual,ts, n_point, row): #assume residual current i
 
     final_position = pd.DataFrame({'seedsPosX': finalPosX, 'seedsPosY': finalPosY, 
                                    'ParentPosX':pos_x, 'ParentPosY':pos_y,
-                                   'CrownSurfaceArea_m2':ran_radius,
-                                   'parent_id':plant_id})
+                                   'CrownSurfaceArea_m2':ran_radius})#,
+                                   # 'parent_id':plant_id})
     final_position['Species']=data_n['Species']
     final_position['row']=row
     

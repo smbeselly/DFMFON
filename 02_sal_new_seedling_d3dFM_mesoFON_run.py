@@ -216,7 +216,7 @@ master_trees = gpd.read_file(os.path.join(MFON_Trees, 'Master-Trees', Mangr_SHP)
 MFON_OUT_compile = os.path.join(MFON_OUT,'Compile')
 
 read_data = pd.read_csv(os.path.join(MFON_OUT_compile,'Coupling_0.txt'))
-read_data['plant_id'] = 'coupling_0_'+read_data.index.astype(str)
+# read_data['plant_id'] = 'coupling_0_'+read_data.index.astype(str)
 
 # use spatial in scipy to match the x,y of the mangroves and the age information.
 # age_coupling0 = calcAgeCoupling0(read_data, master_trees)
@@ -712,7 +712,7 @@ for ntime in range(int(coupling_ntimeUse)):
     Concat_table['Age'] = age_coupling #update age after MesoFON run
     Concat_table.drop(['tick'], inplace=True, axis=1)
     Concat_table = Concat_table.reset_index(drop=True) # reset the index
-    Concat_table['plant_id'] = 'coupling_{}_'.format(ntime+1)+read_data.index.astype(str)
+    # Concat_table['plant_id'] = 'coupling_{}_'.format(ntime+1)+read_data.index.astype(str)
     
     # 12.3. Concatenated table is saved as txt file
     Concat_table.to_csv(os.path.join(MFON_OUT_compile, run_is+'.txt'), sep=',', index=False, header=True)
