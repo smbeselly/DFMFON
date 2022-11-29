@@ -1,7 +1,7 @@
 # DFMFON
 This is a private repo of Delft3D-FM and MesoFON Coupling attempt. This is part of the PhD research by Sebrian Beselly in Monitoring and Modelling Mangrove-Mudflat Dynamics on a Prograding Delta
 
-# What is d3d_meso
+# What is DFMFON
 In the face of climate change, sea level rise (SLR), increase precipitation certainly affects ecosytem and community therein.
 Based on the report of IPCC in 2021, it is certain that the world has been experiencing an increase of temperature up to 1.5C.
 That means, the effect of climate change is not negligible.
