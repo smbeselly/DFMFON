@@ -750,7 +750,7 @@ for ntime in range(int(coupling_ntimeUse)):
         # select the MFON_Trees only and paste it to the MesoFON_Out
         if nama != []:
             shutil.copyfile(nama[0], 
-                            os.path.join(MFON_OUT_tile,Path(nama[0]).stem + ' Coupling_0.txt'))
+                            os.path.join(MFON_OUT_tile,Path(nama[0]).stem +run_is+'.txt'))
             namac.append(nama[0])
 
     ### Compile the results to compile canopy folder
