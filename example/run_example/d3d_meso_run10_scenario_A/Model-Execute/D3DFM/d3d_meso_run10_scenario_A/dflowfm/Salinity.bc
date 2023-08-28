@@ -1,0 +1,33 @@
+[forcing]
+Name                            = Tide_0001
+Function                        = astronomic
+Quantity                        = astronomic component
+Unit                            = -
+Quantity                        = salinitybnd amplitude
+Unit                            = ppt
+Quantity                        = salinitybnd phase
+Unit                            = deg
+A0  25  0
+
+[forcing]
+Name                            = Tide_0002
+Function                        = astronomic
+Quantity                        = astronomic component
+Unit                            = -
+Quantity                        = salinitybnd amplitude
+Unit                            = ppt
+Quantity                        = salinitybnd phase
+Unit                            = deg
+A0  25  0
+
+[forcing]
+Name                            = Discharge_0001
+Function                        = astronomic
+Quantity                        = astronomic component
+Unit                            = -
+Quantity                        = salinitybnd amplitude
+Unit                            = ppt
+Quantity                        = salinitybnd phase
+Unit                            = deg
+A0  0  0
+

@@ -1,0 +1,3 @@
+This is the folder example of typical DFMFON run that you can adopt.
+
+Please read the details in readme

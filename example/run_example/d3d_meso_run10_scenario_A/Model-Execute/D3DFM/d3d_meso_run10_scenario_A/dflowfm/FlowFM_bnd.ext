@@ -1,0 +1,28 @@
+
+[boundary]
+quantity=dischargebnd
+locationFile=Discharge.pli
+forcingFile=Discharge.bc
+
+[boundary]
+quantity=sedfracbndSedimentMud
+locationFile=Discharge.pli
+forcingFile=SedimentMud.bc
+returnTime=5.4000000e+003
+
+[boundary]
+quantity=waterlevelbnd
+locationFile=Tide.pli
+forcingFile=WaterLevel.bc
+
+[boundary]
+quantity = salinitybnd
+locationfile = Tide.pli
+forcingfile = Salinity.bc
+return_time = 5.4000000e+003
+
+[boundary]
+quantity = salinitybnd
+locationfile = Discharge.pli
+forcingfile = Salinity.bc
+return_time = 5.4000000e+003

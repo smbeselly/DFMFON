@@ -1,8 +1,0 @@
-<OGRVRTDataSource>
-<OGRVRTLayer name="CH_bathy">
-<SrcDataSource>CH_bathy.csv</SrcDataSource>
-<GeometryType>wkbPoint</GeometryType>
-<LayerSRS>EPSG:32749</LayerSRS>
-<GeometryField separator=" " encoding="PointFromColumns" x="Lon" y="Lat" z="Alt"/>
-</OGRVRTLayer>
-</OGRVRTDataSource>

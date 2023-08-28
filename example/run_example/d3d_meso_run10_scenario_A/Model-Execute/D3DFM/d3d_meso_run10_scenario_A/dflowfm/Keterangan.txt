@@ -1,0 +1,28 @@
+Bathimetri masih berpunuk
+
+Salinity di sungai adalah 0
+Salinity di tide adalah 25
+
+How to add salinity 0 at River
+
+1. Check Salinity.bc and add salinity 0 forcing in the upstream
+[forcing]
+Name                            = Discharge_0001
+Function                        = astronomic
+Quantity                        = astronomic component
+Unit                            = -
+Quantity                        = salinitybnd amplitude
+Unit                            = ppt
+Quantity                        = salinitybnd phase
+Unit                            = deg
+A0  0  0
+
+2. add another salinity boundary at the FlowFM_bnd.ext
+
+[boundary]
+quantity = salinitybnd
+locationfile = Discharge.pli
+forcingfile = Salinity.bc
+return_time = 5.4000000e+003
+
+3. in FlowFM.mdu change background salinity larger than the largest boundary (here 25) change the Background to 35

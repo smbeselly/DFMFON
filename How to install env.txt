@@ -1,0 +1,9 @@
+conda create --name myenv --file spec-file.txt
+
+Install Git
+https://git-scm.com/download/win
+
+After this install bmi-python and dfm_tools
+
+pip install bmi-python
+:: pip install git+https://github.com/openearth/dfm_tools.git
