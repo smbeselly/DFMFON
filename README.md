@@ -1,4 +1,7 @@
 # DFMFON
+[![Last Commit](https://img.shields.io/github/last-commit/smbeselly/DFMFON)](
+https://github.com/smbeselly/DFMFON/commits/main)
+[![GitHub release](https://img.shields.io/github/release/smbeselly/DFMFON)](https://GitHub.com/smbeselly/DFMFON/releases/)
 This is a private repo of Delft3D-FM and MesoFON Coupling attempt. This is part of the PhD research by Sebrian Beselly in Monitoring and Modelling Mangrove-Mudflat Dynamics on a Prograding Delta
 
 # What is DFMFON
@@ -13,3 +16,28 @@ In this research we attempt to understand how individual mangrove trees respond 
 
 Here, we are trying to couple the state-of-the-art hydro-morphodynamic model Delft3D Flexible Mesh and an individual-based mangrove model MesoFON.
 The output of this coupling project is the dynamic interactions up to the individual level of mangroves to environmental changes.
+
+# 1. Installation
+## 1.1. Install Git
+It is wise to have the git installed in your PC.
+
+You can directly download the executable in WIindows system through this [link](https://git-scm.com/download/win), or refer to the [Git official website](https://git-scm.com/) for other information. 
+## 1.2. Create a virtual environment with Anaconda
+To run the model, it is advised to create a virtual environment with Anaconda. We have prepared the explicit text file containing the spec list.
+
+First, clone the main repository or download the ZIP file.
+
+Change the working directory to the repo location.
+
+In the current working directory, run:
+
+    conda create --name dfmfon --file spec-virtual_env.txt
+
+Once it is finished, activate the newly created virtual environment and install the BMI Python for Delft3D FLexible Mesh
+
+    conda activate dfmfon
+    pip install bmi-python
+
+Now all the required packages have been installed and you are all set to run the DFMFON model. Always make sure to activate the `DFMFON` environment.
+
+
