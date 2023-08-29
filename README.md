@@ -4,7 +4,7 @@ https://github.com/smbeselly/DFMFON/commits/main)
 [![GitHub release](https://img.shields.io/github/release/smbeselly/DFMFON)](https://GitHub.com/smbeselly/DFMFON/releases/)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
-DFMFON is an open-source software to mechanistically simulate the Mangrove and Hydromorphology development, written in Python.
+DFMFON, stands for Delft3D-Flexible Mesh (DFM) and MesoFON (MFON) is an open-source software written in Python to mechanistically simulate the Mangrove and Hydromorphology development. We achieve that by coupling multi-paradigm of individual-based mangrove model [MFON](http://mesofon.org/index.php) and process-based hydromorphodynamic model [DFM](https://oss.deltares.nl/web/delft3dfm).
 
 This model is developed as part of the PhD research by Sebrian Beselly at [IHE Delft](https://www.un-ihe.org/department/coastal-and-urban-risk-resilience) and [Delft University of Technology](https://www.tudelft.nl/).
 
