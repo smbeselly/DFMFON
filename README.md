@@ -7,17 +7,8 @@ https://github.com/smbeselly/DFMFON/commits/main)
 This is a private repo of Delft3D-FM and MesoFON Coupling attempt. This is part of the PhD research by Sebrian Beselly in Monitoring and Modelling Mangrove-Mudflat Dynamics on a Prograding Delta
 
 # What is DFMFON
-In the face of climate change, sea level rise (SLR), increase precipitation certainly affects ecosytem and community therein.
-Based on the report of IPCC in 2021, it is certain that the world has been experiencing an increase of temperature up to 1.5C.
-That means, the effect of climate change is not negligible.
-The rise of sea level is can not be ignored. Several reports has mentioned that several area of Earth has been experiencing SLR.
-In response to that, we should investigate what kind of countermeasure that is sustainable for long run yet safe for all of the ecosystem.
-Several research have shown how vegetation is dynamically adapt to sea level change. e.g., salt marsh and mangrove.
-However, research that investigates the role of mangrove to sea level change is not yet understood.
-In this research we attempt to understand how individual mangrove trees respond the environmental forces, e.g., wave force, tidal circulation, and sediment transport.
 
-Here, we are trying to couple the state-of-the-art hydro-morphodynamic model Delft3D Flexible Mesh and an individual-based mangrove model MesoFON.
-The output of this coupling project is the dynamic interactions up to the individual level of mangroves to environmental changes.
+As climate-change-driven extremes potentially make coastal areas more vulnerable, mangroves can help sustainably protect the coasts. There is a substantial understanding of both mangrove dynamics and hydro-morphodynamic processes. However, the knowledge of complex eco-geomorphic interactions with physical-environmental stressors remains lacking. We introduce a novel coupled modelling approach consisting of an individual-based mangrove (mesoFON) and a process-based hydromorphodynamic model (Delft3D-FM). This coupled model is unique because it resolves spatiotemporal processes, including tidal, seasonal, and decadal environmental changes (water level, flow, sediment availability, and salinity) with full life-stages (propagule, seedling, sapling, mature) mangrove interaction. It allows us to mechanistically simulate forest expansion, retreat, and colonisation influenced by and with feedback on physical-environmental drivers. The model is applied in a schematized mixed fluvial-tidal deltaic mangrove forest in dominantly muddy sediment inspired by the prograding delta of Porong, Indonesia. Model results successfully reproduce observed mangrove extent development, age-height relationship, and morphodynamic delta features.
 
 # 1. Installation
 ## 1.1. Install Git
