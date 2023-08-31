@@ -10,7 +10,7 @@ This model is developed as part of the PhD research by Sebrian Beselly at [IHE D
 
 Publication describing the DFMFON
 
-[Modelling mangrove-mudflat dynamics with a coupled individual-based-hydro-morphodynamic model](https://doi.org/10.1016/j.envsoft.2023.105814){:target="_blank"}  (open access)
+[Modelling mangrove-mudflat dynamics with a coupled individual-based-hydro-morphodynamic model](https://doi.org/10.1016/j.envsoft.2023.105814)  (open access)
 
 # What is DFMFON
 
