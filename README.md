@@ -8,6 +8,10 @@ DFMFON, stands for Delft3D-Flexible Mesh (DFM) and MesoFON (MFON) is an open-sou
 
 This model is developed as part of the PhD research by Sebrian Beselly at [IHE Delft](https://www.un-ihe.org/department/coastal-and-urban-risk-resilience) and [Delft University of Technology](https://www.tudelft.nl/).
 
+Publication describing the DFMFON
+
+[Modelling mangrove-mudflat dynamics with a coupled individual-based-hydro-morphodynamic model](https://doi.org/10.1016/j.envsoft.2023.105814) (open access)
+
 # What is DFMFON
 
 As climate-change-driven extremes potentially make coastal areas more vulnerable, mangroves can help sustainably protect the coasts. There is a substantial understanding of both mangrove dynamics and hydro-morphodynamic processes. However, the knowledge of complex eco-geomorphic interactions with physical-environmental stressors remains lacking. We introduce a novel coupled modelling approach consisting of an individual-based mangrove (mesoFON) and a process-based hydromorphodynamic model (Delft3D-FM). This coupled model is unique because it resolves spatiotemporal processes, including tidal, seasonal, and decadal environmental changes (water level, flow, sediment availability, and salinity) with full life-stages (propagule, seedling, sapling, mature) mangrove interaction. It allows us to mechanistically simulate forest expansion, retreat, and colonisation influenced by and with feedback on physical-environmental drivers. The model is applied in a schematized mixed fluvial-tidal deltaic mangrove forest in dominantly muddy sediment inspired by the prograding delta of Porong, Indonesia. Model results successfully reproduce observed mangrove extent development, age-height relationship, and morphodynamic delta features.
@@ -34,5 +38,35 @@ Once it is finished, activate the newly created virtual environment and install 
     pip install bmi-python
 
 Now all the required packages have been installed and you are all set to run the DFMFON model. Always make sure to activate the `DFMFON` environment.
+
+# 2. Usage
+An example to run DFMFON is provided in the `example' folder.
+
+We provide *run_example* to try the tool and **folder** template, which you can use for your repeatable runs.
+
+## 2.1. Preparation Run
+DFMFON currently has two main script, `01_prep_run.py` and `02_DFMFON_run.py`.
+
+At first, open `01_prep_run.py` in your favorite IDE, I suggest [Spyder](https://www.spyder-ide.org/). Adjust **Input Folder and Files** section to refer to your local directory. Description of each variable:
+> **PROJ_HOME** : main location of your run
+>
+> **SYS_APP** : location of your FnD3D folder, I suggest to always copy the folder under PROJ_HOME folder
+>
+> **D3D_HOME** : location of your Delft3D Flexible Mesh executables
+>
+> **gdal_loc** : location of your gdal installation, usually it is located inside your python virtual environment folder
+>
+> **JAVA_Exe** : location of your Java Emulator
+>
+> **Mangr_SHP** : mangrove shapefile name
+>
+> **D3D_Model** : folder name of your D3D run, always put under `Model-Execute\D3DFM`
+>
+> **D3D_Domain** : name of your DFM domain
+
+Additionally, you can adjust another variable, following your specific model needs.
+
+`EPSG_Project`, `x_res`, `y_res`, `LLWL`
+
 
 
