@@ -70,11 +70,8 @@ Additionally, you can adjust another variable, following your specific model nee
 
 ## 2.2. Coupling Run
 After conducting the Preparation Run, you should have the first MFON simulation and the outputs.
-
 You can copy-paste similar files and folders location of your local run as in `01_prep_run.py` to `02_DFMFON_run.py`.
-
 Complete the information of `config_xml` and `mdu_file`.
-
 Congratulations, you will be ready for the full run of DFMFON model.
 
 
