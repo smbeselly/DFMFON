@@ -1,6 +1,5 @@
 # DFMFON
 
-[![DOI](https://sandbox.zenodo.org/badge/419259649.svg)](https://sandbox.zenodo.org/doi/10.5072/zenodo.10004426)
 ![GitHub last commit (by committer)](https://img.shields.io/github/last-commit/smbeselly/DFMFON)
 ![GitHub commit activity (branch)](https://img.shields.io/github/commit-activity/w/smbeselly/DFMFON)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
