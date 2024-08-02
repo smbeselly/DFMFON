@@ -29,22 +29,34 @@ Beselly, S.M., U. Grueters, M. van Der Wegen, J. Reyns, J. Dijkstra, and D. Roel
 """
 
 #%% Input Folders and Files
-PROJ_HOME = r'E:\06.RepastDFM\Simulation_Results\Research_Run\d3d_meso_run10_template_rev\d3d_meso_run10_scenario_A'
-SYS_APP = r'E:\06.RepastDFM\Simulation_Results\Research_Run\d3d_meso_run10_template_rev\d3d_meso_run10_scenario_A\FnD3D'
-D3D_HOME = r'F:\Research_Run\DFM_EXE\2sebrian_20220518' #sal_veg-OK
-gdal_loc = r'C:\Users\brian\anaconda3\envs\d3dfm\Lib\site-packages\osgeo_utils'
-JAVA_Exe = r'C:\Users\brian\RepastSimphony-2.8\eclipse\jdk11\bin\java.exe'
-Mangr_SHP = 'Tip_Saplings_geser_2.shp'
+PROJ_HOME = r'C:\Users\sbeselly\Downloads\02_1_fullmsl_sn_ext_200x200'
+SYS_APP = r'C:\Users\sbeselly\Downloads\02_1_fullmsl_sn_ext_200x200\FnD3D'
+D3D_HOME = r'C:\Users\sbeselly\Downloads\MASTER\2sebrian_20220518'
+gdal_loc = r'C:\Users\sbeselly\AppData\Local\miniconda3\envs\d3dfm_39\Lib\site-packages\osgeo_utils'
+JAVA_Exe = r'C:\Users\sbeselly\Downloads\MASTER\JDK11\bin\java.exe'
+Mangr_SHP = '3m_04_full_mhwn-msl_200x200.shp'
 
-D3D_Model = 'd3d_meso_run10_scenario_A'
-D3D_Domain = 'Grid_Funnel_1_net.nc'
-MFON_Folder = 'MesoFON_20220506_noSurv'
+D3D_Model = 'd3d_wave_r8_synth'
+D3D_Domain = '20x410_net.nc' # use the new net
+MFON_Folder = 'MesoFON_AV_RZ'
+jar_name = 'MFON_Model_AV_RZ.jar'
+
+xyb_file = 'bathy_ini_dep.xyz' # use this since the dep file is stored here                               
 
 ## Check the complete_model.jar file and change this source file
 Sal_Source = r'C:\Users\brian\git\macro_FON_220111\meso_FON\tile_20_20_sal_'
 Surv_Source = r'C:\Users\brian\git\macro_FON_220111\meso_FON\tile_20_20_surv_'
 Excel_Source = r'C:\Users\brian\git\macro_FON_220111\meso_FON\tile_20_20_trees_input.xls'
 
+## settings           
+EPSG_Project = 3395 #EPSG worldwide mercator
+x_res = 10
+y_res = 10
+no_data_val = -999.0
+tile_size_x = 200 # it is in meter 
+tile_size_y = 200 # which reads info in pixel
+species_name = ['Avicennia_marina', 'Rhizopora_apiculata'] # must as list
+LLWL = -1.1
 #%% Import the necessary packages, set the file path, and input files
 
 import os
@@ -54,7 +66,8 @@ import numpy.ma as ma
 import sys
 print(sys.path)
 sys.path.append(SYS_APP) # as this Func will be in the same folder, no longer needed
-from d3d_prep_raster import d3dConcaveHull, d3dPolySHP, d3dCSV2ClippedRaster, d3dRaster2Tiles#, D3dNewRaster2Tiles
+from d3d_prep_raster import (d3dConcaveHull, d3dPolySHP, d3dCSV2ClippedRaster, 
+                d3dRaster2Tiles, d3dCSV2ClippedRasterExtent)                                                                               
 # from d3d_meso_mangro import csv2ClippedRaster
 from dfm_tools.get_nc import get_netdata
 from d3d_meso_mangro import calcAgeCoupling0
@@ -102,8 +115,9 @@ sys.stdout = Logger()
 PROJ_HOME = os.path.join(PROJ_HOME)
 D3D_HOME = os.path.join(D3D_HOME)
 MFON_HOME = os.path.join(PROJ_HOME,'Model-Execute','MesoFON')
-D3D_workdir = os.path.join(PROJ_HOME,'Model-Execute','D3DFM',D3D_Model) 
-MFON_JAR = os.path.join(MFON_HOME, MFON_Folder,'complete_model.jar')
+D3D_workdir = os.path.join(PROJ_HOME,'Model-Execute','D3DFM',D3D_Model) # model funnel with morpho
+# MFON_JAR = os.path.join(MFON_HOME, 'complete_model.jar')
+MFON_JAR = os.path.join(MFON_HOME, MFON_Folder, jar_name)
 MFON_LocalBatchRunner = os.path.join(MFON_HOME,'local_batch_run.properties')
 gdal_path = os.path.join(gdal_loc)
 JAVAREP = os.path.join(JAVA_Exe)
@@ -125,35 +139,27 @@ if not os.path.exists(MFON_OUT):
 dir_out = os.path.join(MFON_Exchange, 'Initialization')
 if not os.path.exists(dir_out):
     os.makedirs(dir_out)
-## settings
-
-EPSG_Project = 32749 # EPSG code for WGS84/ UTM Zone 49S (Porong case study)
+                                                                                  
 netcdf_domain = os.path.join(D3D_workdir, 'dflowfm', D3D_Domain)
-x_res = 10
-y_res = 10
-no_data_val = -999.0
-tile_size_x = 200 # it is in meter 
-tile_size_y = 200 # which reads info in pixel
-species_name = 'Avicennia_marina'
-LLWL = -1.2
 
 #%% Read the domain and prepare the 'world' for MesoFON
 ##############
 #%% Import the nc file, create hull, and build poly
 nc_in = netcdf_domain
 LLWL = LLWL - 0.5 # to make correction for concavehull process
-
-ugrid_all = get_netdata(file_nc=nc_in)#,multipart=False)
-matrix = np.block([[ma.compressed(ugrid_all.mesh2d_node_x)],[ma.compressed(ugrid_all.mesh2d_node_y)],[ma.compressed(ugrid_all.mesh2d_node_z)]]).T
-# For instance the LLWL value is - 1.5 + 0.5m
-matrix_llwl = np.where(matrix[:,2] < LLWL , -999, matrix[:,2])
-matrix = np.column_stack([matrix[:,:2],matrix_llwl])
-# clean data from -999 and nan value
-matrix= (np.delete(matrix, np.where(matrix == -999)[0], axis=0))
-matrix = (matrix[~np.isnan(matrix).any(axis=1)])
-# create matrix x,y for hull
-mat_hull = np.block([[matrix[:,0]],[matrix[:,1]]]).T 
-
+if xyb_file is None:
+    ugrid_all = get_netdata(file_nc=nc_in)#,multipart=False)
+    matrix = np.block([[ma.compressed(ugrid_all.mesh2d_node_x)],[ma.compressed(ugrid_all.mesh2d_node_y)],[ma.compressed(ugrid_all.mesh2d_node_z)]]).T
+    # For instance the LLWL value is - 1.5 + 0.5m
+    matrix_llwl = np.where(matrix[:,2] < LLWL , -999, matrix[:,2])
+    matrix = np.column_stack([matrix[:,:2],matrix_llwl])
+    # clean data from -999 and nan value
+    matrix= (np.delete(matrix, np.where(matrix == -999)[0], axis=0))
+    matrix = (matrix[~np.isnan(matrix).any(axis=1)])
+    # create matrix x,y for hull
+    mat_hull = np.block([[matrix[:,0]],[matrix[:,1]]]).T 
+else:
+    print('no depth file in mesh')
 ### Observe the data first in QGIS and see what kind of concave hull that can be
 
 # df = pd.read_csv(r'Model-Exchange/MesoFON-Env/Tiling/mat_hull_edit.csv')
@@ -192,16 +198,18 @@ affix = '_clipped'
 # create matrix, in this case we can create a custom matrix from data reading
 # for instance, selection of data points of WoO
 # don't forget to adjust the shapefile from the allowable WoO
+if xyb_file is None:
+    ugrid_all = get_netdata(file_nc=nc_in)#,multipart=False)
+    matrix = np.block([[ma.compressed(ugrid_all.mesh2d_node_x)],[ma.compressed(ugrid_all.mesh2d_node_y)],[ma.compressed(ugrid_all.mesh2d_node_z)]]).T
+    # clean data from -999 and nan value
+    matrix= (np.delete(matrix, np.where(matrix == -999)[0], axis=0))
+    matrix = (matrix[~np.isnan(matrix).any(axis=1)])
+else:
+    matrix = pd.read_csv(os.path.join(D3D_workdir, 'dflowfm', xyb_file), sep= '\t', header=None)
+    matrix = matrix.to_numpy()
 
-ugrid_all = get_netdata(file_nc=nc_in)#,multipart=False)
-matrix = np.block([[ma.compressed(ugrid_all.mesh2d_node_x)],[ma.compressed(ugrid_all.mesh2d_node_y)],[ma.compressed(ugrid_all.mesh2d_node_z)]]).T
-# clean data from -999 and nan value
-matrix= (np.delete(matrix, np.where(matrix == -999)[0], axis=0))
-matrix = (matrix[~np.isnan(matrix).any(axis=1)])
-
-d3dCSV2ClippedRaster(concave_path, concave_name, EPSG_coord, matrix, x_res, y_res, no_data_val, shp_clip, affix)
-
-
+d3dCSV2ClippedRasterExtent(concave_path, concave_name, EPSG_coord, matrix, 
+                           x_res, y_res, no_data_val, shp_clip,dir_out, affix)
 #return to home
 os.chdir(PROJ_HOME)
 #%% Tile the raster and filter + delete nodata tiled raster
@@ -213,7 +221,7 @@ ras_clip = os.path.join(out_path+str('\\')+concave_name+affix+'.tif')
 tile_x = tile_size_x # it is in meter 
 tile_y = tile_size_y # which reads info in pixel
 
-d3dRaster2Tiles(out_path, output_filename, ras_clip, tile_x, tile_y,CreateSHP=True)
+d3dRaster2Tiles(out_path, output_filename, ras_clip, tile_x, tile_y, no_data_val, CreateSHP=True)
 
 import gc
 gc.collect() # to clear memory of variables in python after doing del(variables)
@@ -244,13 +252,14 @@ for filepath in glob.iglob(file_tile):
 file_tile_trees = os.path.join(save_tiled_trees,'tile_*_trees.shp')
 
 for filepath in glob.iglob(file_tile_trees): # looping for all with trees affix
-    # print(filepath)
+    print(filepath)
     tile_0_read = gpd.read_file(filepath)
     posX = tile_0_read['coord_x']
     posY = tile_0_read['coord_y']
     height_m = tile_0_read['height'] #change for independent files or standardized the shp
     id_id = np.arange(len(posX))
-    speciesName = np.ones(len(posX))*1 #if only one species is recorded, however it is better to place this in shapefile
+    # speciesName = np.ones(len(posX))*1 #if only one species is recorded, however it is better to place this in shapefile
+    speciesName = tile_0_read['Species']
     types_species = id_id+1 # this variable starts from 1 to N+1
     shiftedBelowPos = np.ones(len(posX))*1
     age = tile_0_read['age']
@@ -258,7 +267,7 @@ for filepath in glob.iglob(file_tile_trees): # looping for all with trees affix
     if height_m.size != 0:
         height_m = height_m.values  # in metre
         # rbh_m = np.where(height_m < 1.37, f_0(height_m*100)/100/2, f_dbh(height_m*100)/100/2)
-        rbh_m = 0.03/2
+        rbh_m = 0.01/2
     else:
         rbh_m = tile_0_read['height']
 
@@ -270,14 +279,15 @@ for filepath in glob.iglob(file_tile_trees): # looping for all with trees affix
                        'posY' : posY,
                        'shiftedPosX' : posX,
                        'shiftedPosY' : posY,
-                       'shiftedBelowPosX' : speciesName,
-                       'shiftedBelowPosY' : speciesName,
+                       'shiftedBelowPosX' : shiftedBelowPos,
+                       'shiftedBelowPosY' : shiftedBelowPos,
                        'age' : age,
                        'rbh_m' : rbh_m,
                        'newRbh_m' : rbh_m,
                        'height_m' : height_m,
                        'newHeight_m' : height_m})
-    
+    for nn in range(len(species_name)):
+        df.loc[df["speciesName"] == species_name[nn], "speciesName"] = nn+1
     # Create a Pandas Excel writer using XlsxWriter as the engine.
     xls_name = filepath[len(save_tiled_trees):-4]+'_input'+'.xls'
     xls_loc = save_tiled_trees + xls_name
@@ -285,7 +295,7 @@ for filepath in glob.iglob(file_tile_trees): # looping for all with trees affix
     # Convert the dataframe to an XlsxWriter Excel object. Note that we turn off
     # the default header and skip one row to allow us to insert a user defined
     # header.
-    startrowis = 4
+    startrowis = 3+len(species_name)
     
     with pd.ExcelWriter(xls_loc) as writer:
         df.to_excel(writer, sheet_name='Sheet1', index=False, startrow=startrowis, header=True)
@@ -295,12 +305,13 @@ for filepath in glob.iglob(file_tile_trees): # looping for all with trees affix
     # Insert the value in worksheet
     s = wb.get_sheet(0)
     s.write(0,0,'def')
-    s.write(1,0, 1)
-    s.write(1,1, species_name)
-    s.write(2,0, '/def')
-    s.write(3,0, 'values')
-        # position_last = start the data + 1 (since it contains header) 
-    #  + length of data
+        
+    for nn in range(len(species_name)):
+        s.write(nn+1,0, nn+1)
+        s.write(nn+1,1, species_name[nn])
+    s.write(len(species_name)+1,0, '/def')
+    s.write(len(species_name)+2,0, 'values')
+        
     position_last = startrowis + 1 + len(posX)
     s.write(position_last,0, '/values')
     wb.save(xls_loc)
@@ -311,8 +322,6 @@ file_tile_xls = os.path.join(save_tiled_trees,'tile_*_input.xls')
 
 # Delete the existing the execution folder tile_* to prepare for the new one
 for filepate in glob.iglob(os.path.join(MFON_HOME,'tile_*')):
-    # shutil.rmtree(filepath) # delete recursive
-    # print(filepath)
     try:
         send2trash.send2trash(filepate)
     except OSError as e:
@@ -326,8 +335,6 @@ for filepath in glob.iglob(file_tile_xls): # looping for all with trees affix
    with zipfile.ZipFile(MFON_JAR, 'r') as zip_ref:
        zip_ref.extractall(os.path.join(MFON_HOME,xls_folder))
    shutil.copy(MFON_LocalBatchRunner, os.path.join(MFON_HOME,xls_folder))
-
- 
 
 ### Create ideal rasters for initialization files
 
@@ -479,7 +486,7 @@ run_is = 'Coupling_0' # change this with the real name
 # use spatial in scipy to match the x,y of the mangroves and the age information.
 master_trees = gpd.read_file(shp_source)
 age_coupling = calcAgeCoupling0(Concat_table, master_trees)
-Concat_table['Age'] = age_coupling #update age after MesoFON run
+Concat_table['Age'] = age_coupling.to_numpy() #update age after MesoFON run
 Concat_table.drop(['tick'], inplace=True, axis=1)
 Concat_table = Concat_table.reset_index(drop=True) # reset the index
 

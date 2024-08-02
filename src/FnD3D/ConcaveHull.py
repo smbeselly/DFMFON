@@ -1,31 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-Copyright notice
--------------------------
-This library is adapted as part of the PhD research of
-Sebrian Mirdeklis Beselly Putra conducted at IHE Delft Institute 
-for Water Education and Delft University of Technology
+Created on Sun Oct 24 15:46:32 2021
 
-The author  of this library is:
-    Sebrian Beselly
-    s.besellyputra@un-ihe.org
-    s.m.beselly@tudelft.nl
-    sebrian@ub.ac.id
-    
-    IHE Delft Institute for Water Education,
-    PO Box 3015, 2601DA Delft
-    the Netherlands
-    
-This library is free software: you can redistribute it and/or modify 
-it under the terms of the GPL-3.0 license
-    
-This library is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTIBILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-GPL-3.0 license for more details.
+@author: sbe002
 
-
-Note: This set of functions are adapted from authors as informed below:
 see: CONCAVE HULL: A K-NEAREST NEIGHBOURS APPROACH
      FOR THE COMPUTATION OF THE REGION OCCUPIED BY A
      SET OF POINTS

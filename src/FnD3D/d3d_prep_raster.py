@@ -1,31 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-Copyright notice
--------------------------
-This library is developed as part of the PhD research of
-Sebrian Mirdeklis Beselly Putra conducted at IHE Delft Institute 
-for Water Education and Delft University of Technology
+Created on Tue Oct 26 21:12:08 2021
 
-The author  of this library is:
-    Sebrian Beselly
-    s.besellyputra@un-ihe.org
-    s.m.beselly@tudelft.nl
-    sebrian@ub.ac.id
-    
-    IHE Delft Institute for Water Education,
-    PO Box 3015, 2601DA Delft
-    the Netherlands
-    
-This library is free software: you can redistribute it and/or modify 
-it under the terms of the GPL-3.0 license
-    
-This library is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTIBILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-GPL-3.0 license for more details.
-
-Publication related to this library
-Beselly, S.M., U. Grueters, M. van Der Wegen, J. Reyns, J. Dijkstra, and D. Roelvink. “Modelling Mangrove-Mudflat Dynamics with a Coupled Individual-Based-Hydro-Morphodynamic Model.” Environmental Modelling & Software, August 28, 2023, 105814. https://doi.org/10.1016/j.envsoft.2023.105814.
+@author: sbe002
 
 This is the accompaying function to process the preparation for D3DFM-MesoFON
 """
@@ -37,6 +14,7 @@ from dfm_tools.get_nc import get_netdata
 from shapely.geometry import mapping, Polygon
 from osgeo import gdal
 import ConcaveHull as CH
+import geopandas as gpd
 
 #%% Create ConcaveHull for nc_input
 
@@ -146,7 +124,7 @@ def d3dCSV2ClippedRaster(concave_path, concave_name, EPSG_coord, matrix, x_res, 
         f.write('\n'.join(lines))
         
     # Call and run gdal_grid to create raster file from bathymetry
-
+    # abs_path = os.path.join('D:/Git/d3d_meso/')
     os.chdir(concave_path)
     vrt_in = str(concave_name)+'.vrt'
     csv_in = str(concave_name)
@@ -156,6 +134,10 @@ def d3dCSV2ClippedRaster(concave_path, concave_name, EPSG_coord, matrix, x_res, 
     y_min = np.min(matrix[:,1])
     y_max = np.max(matrix[:,1])
     
+    # x_res = 10
+    # y_res = 10
+    
+    # no_data_val = -999
     
     # create a raster with linear interpolation     
     command = 'gdal_grid -zfield "Alt" -a linear:radius=0.0:nodata={no_data_val} -ot Float32 \
@@ -177,9 +159,82 @@ def d3dCSV2ClippedRaster(concave_path, concave_name, EPSG_coord, matrix, x_res, 
     os.system(command_warp.format(cut_call=cut_call, cut_cl=cut_cl, no_data_val=no_data_val, 
                                   ras_out=ras_out, ras_clip=ras_clip))
 
+#%% Create CSV build raster with extent based on CH_ and clip
+def d3dCSV2ClippedRasterExtent(concave_path, concave_name, EPSG_coord, matrix, x_res, y_res, no_data_val, shp_clip, dir_out, affix):
+    """Create raster from the np.array/ matrix and clip the raster based on shapefile
+        
+    Parameters
+    ---------
+    concave_path = path to the output folder
+    concave_name = name of the created raster in string
+    EPSG_coord = EPSG Code as string
+    matrix = data matrix as np.array in x,y,z
+    x_res = x axis resolution in meter
+    y_res = y axis resolution in meter
+    no_data_val = define no data value
+    shp_clip = refer to the shapefile source as mask
+    affix = define the affix of the clipped raster in string
+    
+    Returns
+    ---------
+    Raster from Matrix and
+    Clipped Raster
+    """
+
+    np.savetxt(str(concave_path)+str('\\')+str(concave_name)+'.csv', matrix, fmt="%f", delimiter=",", header='Lon,Lat,Alt',comments='')
+    
+    # Create .vrt file based on the created .csv
+    lines = ['<OGRVRTDataSource>', '<OGRVRTLayer name='+'"'+str(concave_name)+'"'+'>',
+             '<SrcDataSource>'+str(concave_name)+".csv"+'</SrcDataSource>',
+             '<GeometryType>wkbPoint</GeometryType>',
+             '<LayerSRS>EPSG:'+str(EPSG_coord)+'</LayerSRS>',
+             '<GeometryField separator=" " encoding="PointFromColumns" x="Lon" y="Lat" z="Alt"/>',
+             '</OGRVRTLayer>',
+             '</OGRVRTDataSource>']
+    with open(str(concave_path)+str('\\')+str(concave_name)+'.vrt', 'w') as f:
+        f.write('\n'.join(lines))
+        
+    # Call and run gdal_grid to create raster file from bathymetry
+    # abs_path = os.path.join('D:/Git/d3d_meso/')
+    os.chdir(concave_path)
+    vrt_in = str(concave_name)+'.vrt'
+    csv_in = str(concave_name)
+    ras_out = str(concave_name)+'.tif'
+    shp_clipper = os.path.join(dir_out, 'CH_.shp')
+    # x_min = np.min(matrix[:,0])
+    # x_max = np.max(matrix[:,0])
+    # y_min = np.min(matrix[:,1])
+    # y_max = np.max(matrix[:,1])
+    df= gpd.read_file(shp_clipper)
+    x_min, y_min, x_max, y_max = df.geometry.total_bounds
+    
+    # x_res = 10
+    # y_res = 10
+    
+    # no_data_val = -999
+    
+    # create a raster with linear interpolation     
+    command = 'gdal_grid -zfield "Alt" -a linear:radius=0.0:nodata={no_data_val} -ot Float32 \
+                -txe {x_min} {x_max} -tye {y_min} {y_max} \
+                -tr {x_res} {y_res} -l {csv_in} {vrt_in} {ras_out} \
+                --config GDAL_NUM_THREADS ALL_CPUS'
+    
+    os.system(command.format(no_data_val=no_data_val, x_min=x_min, x_max=x_max, 
+                             y_min=y_min, y_max=y_max, x_res=x_res, y_res=y_res, 
+                             csv_in=csv_in, vrt_in=vrt_in, ras_out=ras_out))
+    
+    # call and run gdalwarp to clip the raster and add no data value
+    cut_cl = str(shp_clip)
+    cut_call = str(shp_clip)+'.shp'
+    ras_clip = str(concave_name)+affix+'.tif'
+    
+    command_warp = 'gdalwarp -overwrite -of GTiff -cutline {cut_call} -cl {cut_cl} \
+                    -crop_to_cutline -dstnodata {no_data_val} {ras_out} {ras_clip}'
+    os.system(command_warp.format(cut_call=cut_call, cut_cl=cut_cl, no_data_val=no_data_val, 
+                                  ras_out=ras_out, ras_clip=ras_clip))                                                                                                                                                                                                                                                                   
 #%% Tile the raster and filter + delete nodata tiled raster
  
-def d3dRaster2Tiles(out_path, output_filename, ras_clip, tile_size_x, tile_size_y, CreateSHP=True):
+def d3dRaster2Tiles(out_path, output_filename, ras_clip, tile_size_x, tile_size_y, no_data_val, CreateSHP=True):
     """Create tiles of raster tiles of shapefile
         
     Parameters
@@ -200,12 +255,18 @@ def d3dRaster2Tiles(out_path, output_filename, ras_clip, tile_size_x, tile_size_
     ds = gdal.Open(ras_clip)
     gt = ds.GetGeoTransform()
     band = ds.GetRasterBand(1)
-
+    # stats = band.GetStatistics(True,True) # results = min, max, mean, StdDev
+    # stats[1]-stats[0] = max-min
     xsize = band.XSize
     ysize = band.YSize
-
+    # get coordinates of upper left corner
+    # xmin = gt[0]
+    # ymax = gt[3]
     res = gt[1]
-
+    
+    # determine total length of raster
+    # xlen = res * ds.RasterXSize # convert the size in meter to number of pixels
+    # ylen = res * ds.RasterYSize
     
     # size of a single tile
     xsize_tile = round(tile_size_x/res) #num of pixels in tile_size_x
@@ -221,11 +282,14 @@ def d3dRaster2Tiles(out_path, output_filename, ras_clip, tile_size_x, tile_size_
                                      prep_conv_out=ras_clip, prep_out=prep_out))
             # below is to filter and delete the grid with all nodata value
             dss = gdal.Open(prep_out)
-            bands = dss.GetRasterBand(1)
-            statss = bands.GetStatistics(True,True)
+            array = dss.ReadAsArray()
+            check_no_data = np.all(array == no_data_val)
+            # bands = dss.GetRasterBand(1)
+            # statss = bands.GetStatistics(True,True)
             
-            if statss[0] == 0 and statss[1] == 0:
-                del(dss,bands,statss)
+            # if statss[0] == 0 and statss[1] == 0:
+            if check_no_data == True:
+                del(dss,array,check_no_data)
                 prep_del = prep_out
                 del(prep_out)
                 os.remove(str(prep_del))
@@ -246,9 +310,32 @@ def d3dRaster2Tiles(out_path, output_filename, ras_clip, tile_size_x, tile_size_
                     # import gc 
                     # gc.collect()
                 # deleting variables
-                del(dss,bands,statss,prep_out)
+                del(dss,array,check_no_data)
             
-            
+            # if statss[0]!=statss[1]:
+            #     #build shapefile
+            #     if CreateSHP == True:
+            #         import rasterio as rio
+            #         dt = rio.open(prep_out)
+            #         crs_raster= dt.crs
+            #         left,bottom, right, top = dt.bounds #[left, bottom, right, top]
+            #         # Create Shapefile  
+            #         from shapely.geometry import box
+            #         poly_ras= box(left, bottom, right, top) #create poly box
+            #         # plt.plot(*poly_ras.exterior.xy)
+            #         out_poly_namet = str(output_filename) + str(i) + "_" + str(j)
+            #         d3dPolySHP(poly_ras, out_path, out_poly_namet, str(crs_raster)[5:])
+            #         del(dt, crs_raster, left, bottom, right, top, poly_ras)
+            #         # import gc 
+            #         # gc.collect()
+            #     # deleting variables
+            #     del(dss,bands,statss,prep_out)
+			
+			# else:    
+            #     del(dss,bands,statss)
+            #     prep_del = prep_out
+            #     del(prep_out)
+            #     os.remove(str(prep_del))
 
 #%% Tile the raster and filter + retain nodata tiled raster               
 def d3dRaster2TilesRetain(out_path, output_filename, ras_clip, tile_size_x, tile_size_y, CreateSHP=True):
@@ -272,15 +359,18 @@ def d3dRaster2TilesRetain(out_path, output_filename, ras_clip, tile_size_x, tile
     ds = gdal.Open(ras_clip)
     gt = ds.GetGeoTransform()
     band = ds.GetRasterBand(1)
-
+    # stats = band.GetStatistics(True,True) # results = min, max, mean, StdDev
+    # stats[1]-stats[0] = max-min
     xsize = band.XSize
     ysize = band.YSize
     # get coordinates of upper left corner
-
+    # xmin = gt[0]
+    # ymax = gt[3]
     res = gt[1]
     
     # determine total length of raster
-
+    # xlen = res * ds.RasterXSize # convert the size in meter to number of pixels
+    # ylen = res * ds.RasterYSize
     
     # size of a single tile
     xsize_tile = round(tile_size_x/res) #num of pixels in tile_size_x

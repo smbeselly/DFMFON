@@ -1,31 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-Copyright notice
--------------------------
-This library is developed as part of the PhD research of
-Sebrian Mirdeklis Beselly Putra conducted at IHE Delft Institute 
-for Water Education and Delft University of Technology
+Created on Tue Dec 21 19:38:02 2021
 
-The author  of this library is:
-    Sebrian Beselly
-    s.besellyputra@un-ihe.org
-    s.m.beselly@tudelft.nl
-    sebrian@ub.ac.id
-    
-    IHE Delft Institute for Water Education,
-    PO Box 3015, 2601DA Delft
-    the Netherlands
-    
-This library is free software: you can redistribute it and/or modify 
-it under the terms of the GPL-3.0 license
-    
-This library is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTIBILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-GPL-3.0 license for more details.
-
-Publication related to this library
-Beselly, S.M., U. Grueters, M. van Der Wegen, J. Reyns, J. Dijkstra, and D. Roelvink. “Modelling Mangrove-Mudflat Dynamics with a Coupled Individual-Based-Hydro-Morphodynamic Model.” Environmental Modelling & Software, August 28, 2023, 105814. https://doi.org/10.1016/j.envsoft.2023.105814.
+@author: sbe002
 """
 
 #%% Import Libraries
@@ -55,6 +32,8 @@ import pandas as pd
 from xlrd import open_workbook
 import rasterio as rio
 from affine import Affine
+from scipy.integrate import quad
+from scipy.interpolate import interp2d
 
 #%% Function to rearrange the cell number based on the xzw and yzw position
 
@@ -81,6 +60,8 @@ def create_xyzwCellNumber(xzw,yzw,mesh_face_x,mesh_face_y):
     shape: ndxi, 3    
     column: xzw, yzw, cell number
     """
+    # xzw = model_dfm.get_var('xzw') #x coordinate of the center of gravity of the boxes
+    # xzw = model_dfm.get_var('xzw') #y coordinate
     
     xyzw = np.block([[xzw],[yzw]]).T #matrix xzw,yzw
     mesh_face_xy = np.block([[mesh_face_x],[mesh_face_y]]).T #matrix mesh_face_x, mesh_face_y
@@ -112,13 +93,13 @@ def create_xzyzCellNumber(xz, yz, model_dfm, ugrid_all):
     vegsp_index = np.zeros((len(xzyz),2))
     vegsp_index[:,0] = np.arange(0,len(xzyz))
     
-    for row in range(len(data_verts[:,0,0])):
+    for row in np.arange(len(data_verts[:,0,0])):
         aa = data_verts[row,:,:]
-        
-        ab_subset = df_xzyz[(df_xzyz[0] > min(aa[:,0])) & 
-                                     (df_xzyz[0] < max(aa[:,0]))]
-        ab_subset = ab_subset[(ab_subset[1] > min(aa[:,1])) & 
-                                            (ab_subset[1] < max(aa[:,1]))]
+                
+        ab_subset = df_xzyz.loc[(((df_xzyz[0] >= min(aa[:,0])) 
+                            & (df_xzyz[0] <= max(aa[:,0]))) 
+                                          & ((df_xzyz[1] >= min(aa[:,1])) 
+                                              & (df_xzyz[1] <= max(aa[:,1]))))]
         vegsp_index[row,1] = ab_subset.index.to_numpy()
         # vegsp_index[row,1] = 3*row
         
@@ -208,6 +189,18 @@ def calcDragCoeff(x_range, y_range, cell_area, water_depth, trees_data):
     Calculate the weighted bulk drag coefficient of the cell, located in
     cell centre
     """
+    ## If we want to add different species, we can use this:
+# =============================================================================
+#         import pandas as pd
+#         data_url = 'http://bit.ly/2cLzoxH'
+#         # read data from url as pandas dataframe
+#         gapminder = pd.read_csv(data_url)
+# 
+#         searchstr = r'In(?!$)'
+# 
+#         data = gapminder[gapminder['country'].str.contains(searchstr)]
+#   source : https://cmdlinetips.com/2018/02/how-to-subset-pandas-dataframe-based-on-values-of-a-column/
+# =============================================================================
     ## untuk test saja dummy value
     x_range = x_range
     y_range = y_range
@@ -216,10 +209,10 @@ def calcDragCoeff(x_range, y_range, cell_area, water_depth, trees_data):
     # subsetting pandas 
     #source: https://cmdlinetips.com/2018/02/how-to-subset-pandas-dataframe-based-on-values-of-a-column/
     # and https://www.geeksforgeeks.org/selecting-rows-in-pandas-dataframe-based-on-conditions/
-    read_data_subset = read_data[(read_data['GeoRefPosX'] >= x_range[0]) & 
-                                 (read_data['GeoRefPosX'] <= x_range[1])]
-    read_data_subset = read_data_subset[(read_data_subset['GeoRefPosY'] >= y_range[0]) & 
-                                        (read_data_subset['GeoRefPosY'] <= y_range[1])]
+    read_data_subset = read_data.loc[(((read_data['GeoRefPosX'] >= x_range[0]) 
+                            & (read_data['GeoRefPosX'] <= x_range[1])) 
+                                          & ((read_data['GeoRefPosY'] >= y_range[0]) 
+                                             & (read_data['GeoRefPosY'] <= y_range[1])))]
 
     #retrieve cell area and water depth
     cell_area = cell_area # cell area based on BMI 
@@ -350,30 +343,45 @@ def calcWOO(waterlevel, failure):
     ## sqrt of N,round up, define number of steps for probability analysis
     ## along height gradient
     
-    Pvalue = np.zeros(int(len(step)))
-    fromheight = np.zeros(int(len(step)))
-    toheight = np.zeros(int(len(step)))
-    PvalueNo = np.zeros(int(len(step)))
-    startel = min(WoOfin[:,1])
-    stepsize = (max(WoOfin[:,1]) - min(WoOfin[:,1]))/len(step)
+    if WoOfin.size == 0:
+        fromheight = [0,0]
+        Pvalue = [0,0]
+        print('WoOfin size == 0: WoO Zero')
+    elif max(step) == 0:
+        fromheight = [0,0]
+        Pvalue = [0,0]
+        print('Step == 0: WoO Zero')
+    else:
+        ### probability of survival for different elevations, P success ####
+        d1 = WoOfin[(WoOfin[:,0] == 1)]
+        step = np.arange(np.ceil(np.sqrt(len(d1)))+1)
+        ## sqrt of N,round up, define number of steps for probability analysis
+        ## along height gradient
+        
+        Pvalue = np.zeros(int(max(step)))
+        fromheight = np.zeros(int(max(step)))
+        toheight = np.zeros(int(max(step)))
+        PvalueNo = np.zeros(int(max(step)))
+        startel = min(WoOfin[:,1])
+        stepsize = (max(WoOfin[:,1]) - min(WoOfin[:,1]))/max(step)
 
-    ## calculate size of steps probability calculation
-    # for i in range(int(max(step))):
-    for i in range(int(len(step))):
-        Pselect2 = 0
-        Pselect1 = 0
-        Pselect2 = WoOfin[(WoOfin[:,1] >= (startel + (stepsize*i)))]
-        Pselect1 = Pselect2[(Pselect2[:,1] <= (startel + (stepsize*(1+i))))]
-        if Pselect1.size > 0:
-            Pvalue[i] = sum(Pselect1[:,0])/len(Pselect1[:,0])
-            PvalueNo[i] = sum(Pselect1[:,0])/len(Pselect1[:,0]) * sum(Pselect1[:,0])
-        else:
-            Pvalue[i] = 0
-            PvalueNo[i] = 0
-        # Pvalue[i] = sum(Pselect1[:,0])/len(Pselect1[:,0])
-        # PvalueNo[i] = sum(Pselect1[:,0])/len(Pselect1[:,0]) * sum(Pselect1[:,0])
-        fromheight[i] = startel + (stepsize * (i-1))
-        toheight[i] = startel + (stepsize * (i))
+        ## calculate size of steps probability calculation
+        for i in range(int(max(step))):
+            ii = i+1
+            Pselect2 = 0
+            Pselect1 = 0
+            Pselect2 = WoOfin[(WoOfin[:,1] >= (startel + (stepsize*ii)))]
+            Pselect1 = Pselect2[(Pselect2[:,1] <= (startel + (stepsize*(1+ii))))]  
+            if Pselect1.size > 0:
+                Pvalue[i] = sum(Pselect1[:,0])/len(Pselect1[:,0])
+                PvalueNo[i] = (sum(Pselect1[:,0])/len(Pselect1[:,0])) * sum(Pselect1[:,0])
+            else:
+                Pvalue[i] = 0
+                PvalueNo[i] = 0
+            # Pvalue[i] = sum(Pselect1[:,0])/len(Pselect1[:,0])
+            # PvalueNo[i] = (sum(Pselect1[:,0])/len(Pselect1[:,0])) * sum(Pselect1[:,0])
+            fromheight[i] = startel + (stepsize * (ii-1))
+            toheight[i] = startel + (stepsize * (ii))
     
     return fromheight, Pvalue
 
@@ -409,6 +417,42 @@ def calcAgeCoupling0(read_data, master_trees):
 
     age_coupling0 = read_data['tick']+age_read_data
     age_coupling0 = age_coupling0.reset_index(drop=True)
+    
+    return age_coupling0
+
+def n_calcAgeCoupling0(read_data, mature_sapl):
+    """Calculate total age after initialization.
+    
+          
+    Parameters
+    ---------
+    read_data = mangrove compilation data after MesoFON run
+    
+    master_trees = mangrove data from master trees
+       
+    Returns
+    ---------
+    age_coupling0
+    
+    total age after initialization
+    
+    Index is based on the read_data
+    """
+    read_data_np = read_data[['GeoRefPosX','GeoRefPosY']].to_numpy()
+    master_trees_np = mature_sapl[['GeoRefPosX','GeoRefPosY']].to_numpy()
+    # assign the correct cell number to the matrix (cell number is python based)
+    # if the cell number is read as 0, the real cell number in netCDF is 1
+    #source: https://stackoverflow.com/questions/10818546/finding-index-of-nearest-point-in-numpy-arrays-of-x-and-y-coordinates
+    age_read_data = np.empty((len(read_data),0))
+    for row in range(len(read_data)): #source: https://www.pluralsight.com/guides/numpy-arrays-iterating
+        pt = [read_data_np[row,:]]
+        index = spatial.KDTree(master_trees_np).query(pt)
+        age_read_data = np.append(age_read_data,mature_sapl['Age'][int(index[1])])
+        # age_read_data.append(master_trees['age'][int(index[1])])
+
+    age_coupling0 = read_data['tick']+age_read_data
+    age_coupling0 = age_coupling0.reset_index(drop=True)
+    # age_coupling0 = age_coupling.fillna(0.25)
     
     return age_coupling0
 
@@ -463,6 +507,61 @@ def createPointSHP(read_data, age_coupling, path_shp, EPSG_Project):
         pointShp.write(rowDict)
     #close fiona object
     pointShp.close()
+    
+def createPointSHPmulti(read_data, age_coupling, path_shp, EPSG_Project):
+    """Create a Point Shapefile
+    
+          
+    Parameters
+    ---------
+    read_data = mangrove compilation data after MesoFON run
+    
+    age_coupling = age data from age_coupling
+    
+    path_shp = path to save the shapefile
+    
+    EPSG_Project = str EPSG
+       
+    Returns
+    ---------
+    Point SHP
+    
+    """
+    concave_path = path_shp
+    data_point = [read_data['GeoRefPosX'], read_data['GeoRefPosY'], 
+                  read_data['Height_cm']/100,age_coupling,read_data['dbh_cm']/200,
+                  read_data['Species']]
+    data_point_header = ['coord_x','coord_y','height_m','age','rbh_m','Species']
+    data_point_df = pd.concat(data_point, axis=1, keys=data_point_header)
+    # define schema
+    schema = {
+        'geometry':'Point',
+        'properties':{'coord_x':'float',
+                      'coord_y':'float',
+                      'height_m':'float',
+                      'age':'float',
+                      'rbh_m':'float',
+                      'Species':'str'}
+    }
+
+    #open a fiona object
+    pointShp = fiona.open(concave_path+str('\\')+Path(concave_path).stem+'.shp', mode='w', driver='ESRI Shapefile',
+              schema = schema, crs = 'EPSG:'+str(EPSG_Project))
+    #iterate over each row in the dataframe and save record
+    for index, row in data_point_df.iterrows():
+        rowDict = {
+            'geometry' : {'type':'Point',
+                         'coordinates': (row.coord_x,row.coord_y)},
+            'properties': {'coord_x' : row.coord_x,
+                           'coord_y' : row.coord_y,
+                           'height_m' : row.height_m,
+                           'age' : row.age,
+                           'rbh_m' : row.rbh_m,
+                           'Species': row.Species},
+        }
+        pointShp.write(rowDict)
+    #close fiona object
+    pointShp.close()
 
   
 def createXLSfromSHP(file_tile_trees, a0, b0, a137, b137, save_tiled_trees, species_name):
@@ -503,7 +602,10 @@ def createXLSfromSHP(file_tile_trees, a0, b0, a137, b137, save_tiled_trees, spec
         id_id = np.arange(len(posX))
         speciesName = np.ones(len(posX))*1 #if only one species is recorded, however it is better to place this in shapefile
         types_species = id_id+1 # this variable starts from 1 to N+1
+        # shiftedBelowPos = np.ones(len(posX))*1
         age = tile_0_read['age']
+        # age = np.ones(len(posX))*1 # should be derived from shapefile #TO DO will be added later
+        # rbh_m = (0.0015*height_m**2)+(0.0015*height_m) #dummy it uses equation in test_trial
         # use the new dbh-height relationship  
         if height_m.size != 0:
             height_m = height_m.values  # in metre
@@ -601,9 +703,12 @@ def createRaster4MesoFON(concave_path, gdal_calc_path, no_data_val, save_tiled_e
         # command_surv = 'python {gdal_calc_path} -A {ori_raster} --outfile={surv_raster} --calc={calc_surv} --NoDataValue={no_data_val}'
         command_sal = 'python {gdal_calc_path} -A {ori_raster} --outfile={sal_raster} --calc={calc_sal} --NoDataValue={no_data_val}'
         # calculate
+        # os.system(command_surv.format(gdal_calc_path=gdal_calc_path, ori_raster=ori_raster, \
+        #                               surv_raster=surv_raster, calc_surv=calc_surv, no_data_val=no_data_val))
         os.system(command_sal.format(gdal_calc_path=gdal_calc_path, ori_raster=ori_raster, \
                                      sal_raster=sal_raster, calc_sal=calc_sal, no_data_val=no_data_val))
         # change the nodata value into 0 for surv and 60 for sal
+        # changeNoData(surv_raster,val_no_data_surv) #since the surv raster is calculated from WoO 
         changeNoData(sal_raster,val_no_data_sal)
         # copy and rename the new raster for surv
         raster_surv = surv_raster
@@ -658,6 +763,12 @@ def modifyParamMesoFON(MFON_HOME, MFON_Exchange, save_tiled_env, save_tiled_tree
            sys.stdout.write(line)
     # The Looping to replace the variables in the params files
     for filepatf in glob.iglob(os.path.join(MFON_Exchange,'Initialization','tile_*.tif')):
+        # Init_Rasters = save_tiled_env
+        # Init_Trees = save_tiled_trees
+        # Create Update Path
+        # Sal_Update = os.path.join(Init_Rasters,Path(filepatf).stem+'_sal_').replace("\\",'/')
+        # Surv_Update = os.path.join(Init_Rasters,Path(filepatf).stem+'_surv_').replace("\\",'/')
+        # Excel_Update = os.path.join(Init_Trees,Path(filepatf).stem+'_trees_input.xls').replace("\\",'/')
         Sal_Update = 'coupling'+str(ntime+1)
         Surv_Update = 'coupling'+str(ntime+1)
         Excel_Update = 'coupling'+str(ntime+1)
@@ -699,10 +810,10 @@ def calcDragInLoop(xyzw_cell_number, model_dfm, xyzw_nodes, xk, yk, read_data):
         y_range = [np.min(nodes_pos[1]), np.max(nodes_pos[1])]
         
         # subsetting pandas 
-        read_data_subset = read_data[(read_data['GeoRefPosX'] >= x_range[0]) & 
-                                     (read_data['GeoRefPosX'] <= x_range[1])]
-        read_data_subset = read_data_subset[(read_data_subset['GeoRefPosY'] >= y_range[0]) & 
-                                            (read_data_subset['GeoRefPosY'] <= y_range[1])]
+        read_data_subset = read_data.loc[(((read_data['GeoRefPosX'] >= x_range[0]) 
+                            & (read_data['GeoRefPosX'] <= x_range[1])) 
+                                          & ((read_data['GeoRefPosY'] >= y_range[0]) 
+                                             & (read_data['GeoRefPosY'] <= y_range[1])))]
         # TODO check cell_area and water_depth
         cell_area = ba[row] # check this later 
         water_depth = hs[row]# adjust
@@ -760,6 +871,12 @@ def csv2ClippedRaster(concave_path, surv_val_raster, concave_name, x_res, y_res,
     with open(str(concave_path)+str('\\')+str(concave_name)+'.vrt', 'w') as f:
         f.write('\n'.join(lines))
      
+    # x_min = np.min(surv_val_raster[:,0])
+    # x_max = np.max(surv_val_raster[:,0])
+    # y_min = np.min(surv_val_raster[:,1])
+    # y_max = np.max(surv_val_raster[:,1])
+    # x_width = (x_max-x_min)/x_res
+    # y_height = (y_max-y_min)/y_res
     template = os.path.join(dir_out,'CH_bathy__clipped.tif')
     ds = gdal.Open(template)
     gt = ds.GetGeoTransform()
@@ -792,16 +909,20 @@ def d3dNewRaster2Tiles(ras_clip, out_path, tile_size_x, tile_size_y, dir_out):
     ds = gdal.Open(ras_clip)
     gt = ds.GetGeoTransform()
     band = ds.GetRasterBand(1)
-
+    # stats = band.GetStatistics(True,True) # results = min, max, mean, StdDev
+    # stats[1]-stats[0] = max-min
     xsize = band.XSize
     ysize = band.YSize
     # get coordinates of upper left corner
-
+    # xmin = gt[0]
+    # ymax = gt[3]
     res = gt[1]
 
     # close dataset
     ds = None
     # determine total length of raster
+    # xlen = res * ds.RasterXSize # convert the size in meter to number of pixels
+    # ylen = res * ds.RasterYSize
 
     # size of a single tile
     xsize_tile = round(tile_size_x/res) #num of pixels in tile_size_x
@@ -826,16 +947,20 @@ def Sald3dNewRaster2Tiles(ras_clip, out_path, tile_size_x, tile_size_y, dir_out,
     ds = gdal.Open(ras_clip)
     gt = ds.GetGeoTransform()
     band = ds.GetRasterBand(1)
-
+    # stats = band.GetStatistics(True,True) # results = min, max, mean, StdDev
+    # stats[1]-stats[0] = max-min
     xsize = band.XSize
     ysize = band.YSize
     # get coordinates of upper left corner
-
+    # xmin = gt[0]
+    # ymax = gt[3]
     res = gt[1]
 
     # close dataset
     ds = None
     # determine total length of raster
+    # xlen = res * ds.RasterXSize # convert the size in meter to number of pixels
+    # ylen = res * ds.RasterYSize
 
     # size of a single tile
     xsize_tile = round(tile_size_x/res) #num of pixels in tile_size_x
@@ -882,7 +1007,17 @@ def clipSHPcreateXLSfromGPD(file_tile, save_tiled_trees, shp_source, species_nam
     
     """
 
-    for filepath in glob.iglob(file_tile):        
+    for filepath in glob.iglob(file_tile):
+        # print(filepath)
+        # save_name = Path(filepath).stem+'_trees'+'.shp'
+        # save_loc = os.path.join(folder_loc,save_name)
+        # save_loc = os.path.join(save_tiled_trees,save_name)
+    # =============================================================================
+    #     command_ogr = 'ogr2ogr -clipsrc {filepath} {save_loc} {shp_source} -f "ESRI Shapefile"'
+    #     os.system(command_ogr.format(filepath=filepath, save_loc=save_loc, 
+    #                                   shp_source=shp_source))
+    # =============================================================================
+        
        
         d137 = np.arange(0,125.5,0.5)
         d0 = d137
@@ -907,12 +1042,16 @@ def clipSHPcreateXLSfromGPD(file_tile, save_tiled_trees, shp_source, species_nam
         id_id = np.arange(len(posX))
         speciesName = np.ones(len(posX))*1 #if only one species is recorded, however it is better to place this in shapefile
         types_species = id_id+1 # this variable starts from 1 to N+1
-
+        # shiftedBelowPos = np.ones(len(posX))*1
         age = tree_point['age']
-
+        # age = np.ones(len(posX))*1 # should be derived from shapefile #TO DO will be added later
+        # rbh_m = (0.0015*height_m**2)+(0.0015*height_m) #dummy it uses equation in test_trial
+        # use the new dbh-height relationship  
         if height_m.size != 0:
+            # height_m = height_m.values  # in metre
             rbh_m = np.where(height_m < 1.37, f_0(height_m*100)/100/2, f_dbh(height_m*100)/100/2)
-
+            # (height_m*100)/100/2 karena mengonversi dari dbh ke rbh
+            # rbh_m = np.where(height_m < 1.37, f_0(height_m*50)/50, f_rbh(height_m*50)/50)
         else:
             rbh_m = tree_point['height_m']
     
@@ -1033,10 +1172,10 @@ def list_subset(xyzw_cell_number, index_veg_cel, xyzw_nodes, xk, yk, read_data):
             y_range = [np.min(nodes_pos[1]), np.max(nodes_pos[1])]
             
             # subsetting pandas 
-            read_data_subset = read_data[(read_data['GeoRefPosX'] >= x_range[0]) & 
-                                         (read_data['GeoRefPosX'] <= x_range[1])]
-            read_data_subset = read_data_subset[(read_data_subset['GeoRefPosY'] >= y_range[0]) & 
-                                                (read_data_subset['GeoRefPosY'] <= y_range[1])]
+            read_data_subset = read_data.loc[(((read_data['GeoRefPosX'] >= x_range[0]) 
+                            & (read_data['GeoRefPosX'] <= x_range[1])) 
+                                          & ((read_data['GeoRefPosY'] >= y_range[0]) 
+                                             & (read_data['GeoRefPosY'] <= y_range[1])))]
         
         list_read_subset.append(read_data_subset)
         
@@ -1053,10 +1192,10 @@ def list_subsetCdveg(ugrid_all, xzyz_cell_number, index_veg_cel, read_data):
             position = xzyz_cell_number[row,2].astype(int)
             aa = data_verts[position,:,:]
             # subsetting pandas 
-            read_data_subset = read_data[(read_data['GeoRefPosX'] >= min(aa[:,0])) & 
-                                         (read_data['GeoRefPosX'] <= max(aa[:,0]))]
-            read_data_subset = read_data_subset[(read_data_subset['GeoRefPosY'] >= min(aa[:,1])) & 
-                                                (read_data_subset['GeoRefPosY'] <= max(aa[:,1]))]
+            read_data_subset = read_data.loc[(((read_data['GeoRefPosX'] >= min(aa[:,0])) 
+                            & (read_data['GeoRefPosX'] <= max(aa[:,0]))) 
+                                          & ((read_data['GeoRefPosY'] >= min(aa[:,1])) 
+                                             & (read_data['GeoRefPosY'] <= max(aa[:,1]))))]
         
         list_read_subset.append(read_data_subset)
         
@@ -1065,11 +1204,38 @@ def list_subsetCdveg(ugrid_all, xzyz_cell_number, index_veg_cel, read_data):
 ### drag predictor formula
 def initCalcDraginLoop(xyzw_cell_number, xyzw_nodes, xk, yk, read_data, model_dfm, index_veg_cel):
     Cd_no = 0.005 # assume drag coefficient without the presence of vegetation
+    # Parameters of the CPRS and Number of Pneumatophore as in Vovides, et al.,2016
+    # a_cprs = 1.45 
+    # b_cprs = 8.97
+    # N Pneumatophore as in van Maanen 
     d_pneu = 0.01 # m
     h_pneu = 0.15 # m
     f_pneu = 0.3 # const in van Maanen
     D05_pneu = 20 # const in van Maanen
-       
+    ## Create an array of vegetated cell
+    # index_veg_cel = np.empty((model_dfm.get_var('Cdvegsp').shape[0],0))
+    # for row in range(len(xyzw_cell_number)):
+    #     position = xyzw_cell_number[row,2].astype(int)
+        
+    #     nodes_data = ma.compressed(xyzw_nodes[position][xyzw_nodes[position].mask == False]).astype(int)# select only the valid data (unmasked / false)
+    #     nodes_pos = np.block([[xk[nodes_data-1]],[yk[nodes_data-1]]]) # substracted to 1 in order to adjust the 0-based position in python
+    #     # Find the min max of each x,y coordinate
+    #     # create the list of x_min-x_max and y_min-y_max
+    #     x_range = [np.min(nodes_pos[0]), np.max(nodes_pos[0])]
+    #     y_range = [np.min(nodes_pos[1]), np.max(nodes_pos[1])]
+        
+    #     # subsetting pandas 
+    #     read_data_subset = read_data[(read_data['GeoRefPosX'] >= x_range[0]) & 
+    #                                  (read_data['GeoRefPosX'] <= x_range[1])]
+    #     read_data_subset = read_data_subset[(read_data_subset['GeoRefPosY'] >= y_range[0]) & 
+    #                                         (read_data_subset['GeoRefPosY'] <= y_range[1])]
+    #     if read_data_subset.shape[0] == 0: #if 0 then skip
+    #         index_is = 0
+    #     else:
+    #         index_is = 1
+    #     index_veg_cel = np.append(index_veg_cel, index_is)
+    # the boundary flow nodes are located at the end of array
+    
     ba = model_dfm.get_var('ba') #surface area of the boxes (bottom area) {"location": "face", "shape": ["ndx"]}
     hs = model_dfm.get_var('hs') #water depth at the end of timestep {"location": "face", "shape": ["ndx"]}
     
@@ -1100,11 +1266,17 @@ def initCalcDraginLoop(xyzw_cell_number, xyzw_nodes, xk, yk, read_data, model_df
                 y_range = [np.min(nodes_pos[1]), np.max(nodes_pos[1])]
                 
                 # subsetting pandas 
-                read_data_subset = read_data[(read_data['GeoRefPosX'] >= x_range[0]) & 
-                                             (read_data['GeoRefPosX'] <= x_range[1])]
-                read_data_subset = read_data_subset[(read_data_subset['GeoRefPosY'] >= y_range[0]) & 
-                                                    (read_data_subset['GeoRefPosY'] <= y_range[1])]
-             
+                read_data_subset = read_data.loc[(((read_data['GeoRefPosX'] >= x_range[0]) 
+                            & (read_data['GeoRefPosX'] <= x_range[1])) 
+                                          & ((read_data['GeoRefPosY'] >= y_range[0]) 
+                                             & (read_data['GeoRefPosY'] <= y_range[1])))]
+               
+                # calculate the drag coefficient (currently only for Avicennia marina)
+                # cd_veg = calcDragCoeff(x_range, y_range, cell_area, water_depth, trees_data)
+            
+                # Calculate the CPRS and Number of Pneumatophore
+                # Define the boundary (CPRS) as in Vovides, et al.,2016          
+                # cprs_avicennia = (a_cprs*read_data_subset['dbh_cm'])/(b_cprs+read_data_subset['dbh_cm']) #results in meter
             
                 # Volume of the aerial roots
                 N_pneu = 10025*(1/(1+np.exp(f_pneu*(D05_pneu-read_data_subset['dbh_cm']))))
@@ -1135,11 +1307,16 @@ def initCalcDraginLoop(xyzw_cell_number, xyzw_nodes, xk, yk, read_data, model_df
             
                 # Characteristic Length (m)
                 L = (V-Vm)/Am
-
+                # Cd_no = 0.005 # assume drag coefficient without the presence of vegetation
                 e_drag = 5 # set to 5m to obtain realistic value for Cd
             
                 Cd_calc = (Cd_no + (e_drag/L)).sum()
-
+                # TODO this is just for reminder of the commented script
+                # is it really needed to calculate the weighted drag?
+                # Cd_calc_weighted = Cd_calc*(Vm.sum()/V) + Cd_no * ((V-Vm.sum())/V)
+                
+                # append the calculated cd_veg to the drag_coeff list
+                # drag_coeff.append(cd_veg)
                 drag_coeff = np.append(drag_coeff, Cd_calc)
         
     return drag_coeff
@@ -1155,6 +1332,35 @@ def initCalcDraginLoopCdveg(xzyz_cell_number, model_dfm, ugrid_all, index_veg_ce
     hs = model_dfm.get_var('hs') #water depth at the end of timestep {"location": "face", "shape": ["ndx"]}
     
     data_verts = ugrid_all.verts
+    
+    def calc_ab(HR, x2):
+        if HR > 2.24:
+            b = 0
+            a = -(HR/x2**2)
+        else:
+            b = np.tan((20.88*HR - 46.87)*np.pi/180)
+            a = -((b*x2+HR)/x2**2)
+        
+        return a, b
+
+    def calc_F_vol(a,b,x):
+        F = (((2*a*x + b) * np.sqrt(1 + (2*a*x + b)**2)) / 4*a) + \
+            ((np.log((2*a*x + b) + np.sqrt(1 + (2*a*x + b)**2)))/4*a)
+        
+        return F
+    
+    def calc_L_vol(x2, HR, a, b, D):
+        if D < HR:
+            x1 = (-b-np.sqrt(b**2-4*a*(HR-D)))/2*a
+            F1 = calc_F_vol(a,b,x1)
+            F2 = calc_F_vol(a,b,x2)
+            L = F2-F1
+        else:
+            F2 = calc_F_vol(a,b,x2)
+            F0 = calc_F_vol(a,b,0)
+            L = F2-F0
+        
+        return L
     
     drag_coeff = np.empty((model_dfm.get_var('Cdvegsp').shape[0],0))
     for row in range(len(xzyz_cell_number)):
@@ -1176,13 +1382,17 @@ def initCalcDraginLoopCdveg(xzyz_cell_number, model_dfm, ugrid_all, index_veg_ce
                 position = xzyz_cell_number[row,2].astype(int)
                 aa = data_verts[position,:,:]
                 # subsetting pandas 
-                read_data_subset = read_data[(read_data['GeoRefPosX'] >= min(aa[:,0])) & 
-                                             (read_data['GeoRefPosX'] <= max(aa[:,0]))]
-                read_data_subset = read_data_subset[(read_data_subset['GeoRefPosY'] >= min(aa[:,1])) & 
-                                                    (read_data_subset['GeoRefPosY'] <= max(aa[:,1]))]
-               
+                read_data_subset = read_data.loc[(((read_data['GeoRefPosX'] >= min(aa[:,0])) 
+                            & (read_data['GeoRefPosX'] <= max(aa[:,0]))) 
+                                          & ((read_data['GeoRefPosY'] >= min(aa[:,1])) 
+                                             & (read_data['GeoRefPosY'] <= max(aa[:,1]))))]
+                
+                avicennia = read_data_subset.loc[read_data_subset['Species']=='Avicennia_marina'].copy() # for avicennia
+                RhDFrm = read_data_subset.loc[read_data_subset['Species']=='Rhizopora_apiculata'].copy() # for Rhizopora
+                
+                ## Calculate Avicennia Contribution
                 # Volume of the aerial roots
-                N_pneu = 10025*(1/(1+np.exp(f_pneu*(D05_pneu-read_data_subset['dbh_cm']))))
+                N_pneu = 10025*(1/(1+np.exp(f_pneu*(D05_pneu-avicennia['dbh_cm']))))
                           
                 # if function to adjust the h_pneu for Avicennia
                 # this equation is from Du, Qin, et al. 2021
@@ -1196,34 +1406,120 @@ def initCalcDraginLoopCdveg(xzyz_cell_number, model_dfm, ugrid_all, index_veg_ce
             
                 # Calculate the d_0 from height of the tree, wait for Uwe Grueter Confirmation
                 # height is adjusted from the water depth
-                Vm_trunk = np.pi/4*(read_data_subset['dbh_cm']/100)**2*water_depth #m^3 
-                Am_trunk = (read_data_subset['dbh_cm']/100)*water_depth #m^3 
+                Vm_trunk = np.pi/4*(avicennia['dbh_cm']/100)**2*water_depth #m^3 
+                Am_trunk = (avicennia['dbh_cm']/100)*water_depth #m^3 
             
                 # sum of the obstacle volume
-                Vm = Vm_pneu_total + Vm_trunk #m^3
+                Vm_avc = Vm_pneu_total + Vm_trunk #m^3
                 # sum of the obstacle area
-                Am = Am_pneu_total + Am_trunk#m^2
-            
+                Am_avc = Am_pneu_total + Am_trunk#m^2
+                
+                ## Contribution of Rhizopora; Ohira, et.al (2013)
+                
+                RhDFrm['HRmax'] = (7.56*RhDFrm['dbh_cm']/100) + 0.5
+                RhDFrm['N'] = np.ceil(3.15*RhDFrm['HRmax']**2 + 5.3*RhDFrm['HRmax'] + 0.114)
+                RhDFrm['intervalRoot']= (RhDFrm['HRmax']-0.25) / (RhDFrm['N'] -1) # this is the interval of each root shoots + 0.25
+                RhDFrm['HR'] = 0.25+RhDFrm['intervalRoot']
+                RhDFrm['x2'] = 1.88*RhDFrm['HR'] - 0.432
+                RhDFrm['rootDia'] = 0.04*RhDFrm['dbh_cm']/100 + 0.005*RhDFrm['HR'] + 0.024
+                RhDFrm['thetaRoot'] = 20.88*RhDFrm['HR'] - 46.87 # in degrees 
+                
+                # HRmax = RhDFrm['HRmax'].to_numpy()
+                HR = RhDFrm['HR'].to_numpy()
+                x2 = RhDFrm['x2'].to_numpy()
+                rootDia = RhDFrm['rootDia'].to_numpy()
+                RhDBH = RhDFrm['dbh_cm'].to_numpy()/100
+                
+                a = []
+                b = []
+                for i in np.arange(len(HR)):
+                    acalc, bcalc = calc_ab(HR[i], x2[i])
+                    
+                    a = np.append(a, acalc)
+                    b = np.append(b, bcalc)
+                
+                L = []  ## Ini yang butuh water level
+                for i in np.arange(len(x2)):
+                    Lcalc = calc_L_vol(x2[i], HR[i], a[i], b[i], water_depth)
+                    
+                    L = np.append(L, Lcalc)
+                
+                Vol_Root = L*(rootDia/2)**2*np.pi
+                Area_Root = L*rootDia
+                Vm_stem = []
+                Am_stem = []
+                for i in np.arange(len(RhDBH)):
+                    if RhDBH[i] > water_depth:
+                        Vm_stemp = 0
+                        Am_stemp = 0
+                    else:
+                        Vm_stemp = np.pi/4*(RhDBH[i])**2*water_depth #m^3 
+                        Am_stemp = RhDBH[i]*water_depth #m^3 
+                    
+                    Vm_stem = np.append(Vm_stem, Vm_stemp)
+                    Am_stem = np.append(Am_stem, Am_stemp)
+                
+                # sum of the obstacle volume
+                Vm_rhiz = pd.Series(Vol_Root + Vm_stem) #m^3
+                # sum of the obstacle area
+                Am_rhiz = pd.Series(Area_Root + Am_stem)#m^2
+                
+                Vm_tot = Vm_avc.append(Vm_rhiz, ignore_index=True)
+                Am_tot = Am_avc.append(Am_rhiz, ignore_index=True)
                 # Volume of the control water
             
                 V = cell_area*water_depth
             
                 # Characteristic Length (m)
-                L = (V-Vm)/Am
+                L = (V - Vm_tot) / Am_tot
+                # Cd_no = 0.005 # assume drag coefficient without the presence of vegetation
                 e_drag = 5 # set to 5m to obtain realistic value for Cd
             
                 Cd_calc = (Cd_no + (e_drag/L)).sum()
+                # TODO this is just for reminder of the commented script
+                # is it really needed to calculate the weighted drag?
+                # Cd_calc_weighted = Cd_calc*(Vm.sum()/V) + Cd_no * ((V-Vm.sum())/V)
+                
+                # append the calculated cd_veg to the drag_coeff list
+                # drag_coeff.append(cd_veg)
                 drag_coeff = np.append(drag_coeff, Cd_calc)
         
     return drag_coeff
 
 def newCalcDraginLoop(xyzw_cell_number, read_data, model_dfm, index_veg_cel, list_read_subset):
-    Cd_no = 0.005
+    Cd_no = 0.005 # assume drag coefficient without the presence of vegetation
+    # Parameters of the CPRS and Number of Pneumatophore as in Vovides, et al.,2016
+    # a_cprs = 1.45 
+    # b_cprs = 8.97
+    # N Pneumatophore as in van Maanen 
     d_pneu = 0.01 # m
     h_pneu = 0.15 # m
     f_pneu = 0.3 # const in van Maanen
     D05_pneu = 20 # const in van Maanen
-       
+    ## Create an array of vegetated cell
+    # index_veg_cel = np.empty((model_dfm.get_var('Cdvegsp').shape[0],0))
+    # for row in range(len(xyzw_cell_number)):
+    #     position = xyzw_cell_number[row,2].astype(int)
+        
+    #     nodes_data = ma.compressed(xyzw_nodes[position][xyzw_nodes[position].mask == False]).astype(int)# select only the valid data (unmasked / false)
+    #     nodes_pos = np.block([[xk[nodes_data-1]],[yk[nodes_data-1]]]) # substracted to 1 in order to adjust the 0-based position in python
+    #     # Find the min max of each x,y coordinate
+    #     # create the list of x_min-x_max and y_min-y_max
+    #     x_range = [np.min(nodes_pos[0]), np.max(nodes_pos[0])]
+    #     y_range = [np.min(nodes_pos[1]), np.max(nodes_pos[1])]
+        
+    #     # subsetting pandas 
+    #     read_data_subset = read_data[(read_data['GeoRefPosX'] >= x_range[0]) & 
+    #                                  (read_data['GeoRefPosX'] <= x_range[1])]
+    #     read_data_subset = read_data_subset[(read_data_subset['GeoRefPosY'] >= y_range[0]) & 
+    #                                         (read_data_subset['GeoRefPosY'] <= y_range[1])]
+    #     if read_data_subset.shape[0] == 0: #if 0 then skip
+    #         index_is = 0
+    #     else:
+    #         index_is = 1
+    #     index_veg_cel = np.append(index_veg_cel, index_is)
+    # the boundary flow nodes are located at the end of array
+    
     ba = model_dfm.get_var('ba') #surface area of the boxes (bottom area) {"location": "face", "shape": ["ndx"]}
     hs = model_dfm.get_var('hs') #water depth at the end of timestep {"location": "face", "shape": ["ndx"]}
     
@@ -1252,12 +1548,35 @@ def newCalcDraginLoop(xyzw_cell_number, read_data, model_dfm, index_veg_cel, lis
                 diaveg_coeff = np.append(diaveg_coeff, 0)
                 stemheight_coeff = np.append(stemheight_coeff, 0)
             else:
-                
+                # print(row)
+               # find the position based on the cell number
+# =============================================================================
+#                 position = xyzw_cell_number[row,2].astype(int)
+#                 
+#                 nodes_data = ma.compressed(xyzw_nodes[position][xyzw_nodes[position].mask == False]).astype(int)# select only the valid data (unmasked / false)
+#                 nodes_pos = np.block([[xk[nodes_data-1]],[yk[nodes_data-1]]]) # substracted to 1 in order to adjust the 0-based position in python
+#                 # Find the min max of each x,y coordinate
+#                 # create the list of x_min-x_max and y_min-y_max
+#                 x_range = [np.min(nodes_pos[0]), np.max(nodes_pos[0])]
+#                 y_range = [np.min(nodes_pos[1]), np.max(nodes_pos[1])]
+#                 
+#                 # subsetting pandas 
+#                 read_data_subset = read_data[(read_data['GeoRefPosX'] >= x_range[0]) & 
+#                                              (read_data['GeoRefPosX'] <= x_range[1])]
+#                 read_data_subset = read_data_subset[(read_data_subset['GeoRefPosY'] >= y_range[0]) & 
+#                                                     (read_data_subset['GeoRefPosY'] <= y_range[1])]
+# =============================================================================
                 
                 read_data_subset = list_read_subset[row]
                 
     
-                
+                # calculate the drag coefficient (currently only for Avicennia marina)
+                # cd_veg = calcDragCoeff(x_range, y_range, cell_area, water_depth, trees_data)
+            
+                # Calculate the CPRS and Number of Pneumatophore
+                # Define the boundary (CPRS) as in Vovides, et al.,2016          
+                # cprs_avicennia = (a_cprs*read_data_subset['dbh_cm'])/(b_cprs+read_data_subset['dbh_cm']) #results in meter
+            
                 # Volume of the aerial roots
                 N_pneu = 10025*(1/(1+np.exp(f_pneu*(D05_pneu-read_data_subset['dbh_cm']))))
                           
@@ -1287,11 +1606,16 @@ def newCalcDraginLoop(xyzw_cell_number, read_data, model_dfm, index_veg_cel, lis
             
                 # Characteristic Length (m)
                 L = (V-Vm)/Am
-                
+                # Cd_no = 0.005 # assume drag coefficient without the presence of vegetation
                 e_drag = 5 # set to 5m to obtain realistic value for Cd
             
                 Cd_calc = (Cd_no + (e_drag/L)).sum()
+                # TODO this is just for reminder of the commented script
+                # is it really needed to calculate the weighted drag?
+                # Cd_calc_weighted = Cd_calc*(Vm.sum()/V) + Cd_no * ((V-Vm.sum())/V)
                 
+                # append the calculated cd_veg to the drag_coeff list
+                # drag_coeff.append(cd_veg)
                 drag_coeff = np.append(drag_coeff, Cd_calc)
                 
                 # calculate rnveg, diaveg, and stemheight
@@ -1317,6 +1641,35 @@ def newCalcDraginLoopCdveg(model_dfm, xzyz_cell_number, index_veg_cel,list_read_
     ba = model_dfm.get_var('ba') #surface area of the boxes (bottom area) {"location": "face", "shape": ["ndx"]}
     hs = model_dfm.get_var('hs') #water depth at the end of timestep {"location": "face", "shape": ["ndx"]}
     
+    def calc_ab(HR, x2):
+        if HR > 2.24:
+            b = 0
+            a = -(HR/x2**2)
+        else:
+            b = np.tan((20.88*HR - 46.87)*np.pi/180)
+            a = -((b*x2+HR)/x2**2)
+        
+        return a, b
+
+    def calc_F_vol(a,b,x):
+        F = (((2*a*x + b) * np.sqrt(1 + (2*a*x + b)**2)) / 4*a) + \
+            ((np.log((2*a*x + b) + np.sqrt(1 + (2*a*x + b)**2)))/4*a)
+        
+        return F
+    
+    def calc_L_vol(x2, HR, a, b, D):
+        if D < HR:
+            x1 = (-b-np.sqrt(b**2-4*a*(HR-D)))/2*a
+            F1 = calc_F_vol(a,b,x1)
+            F2 = calc_F_vol(a,b,x2)
+            L = F2-F1
+        else:
+            F2 = calc_F_vol(a,b,x2)
+            F0 = calc_F_vol(a,b,0)
+            L = F2-F0
+        
+        return L
+    
     drag_coeff = np.empty((model_dfm.get_var('Cdvegsp').shape[0],0))
 
     for row in range(len(xzyz_cell_number)):
@@ -1339,7 +1692,8 @@ def newCalcDraginLoopCdveg(model_dfm, xzyz_cell_number, index_veg_cel,list_read_
                  
                 read_data_subset = list_read_subset[row]
                 
-    
+                avicennia = read_data_subset.loc[read_data_subset['Species']=='Avicennia_marina'].copy() # for avicennia
+                RhDFrm = read_data_subset.loc[read_data_subset['Species']=='Rhizopora_apiculata'].copy() # for Rhizopora
 
                 # Volume of the aerial roots
                 N_pneu = 10025*(1/(1+np.exp(f_pneu*(D05_pneu-read_data_subset['dbh_cm']))))
@@ -1357,19 +1711,71 @@ def newCalcDraginLoopCdveg(model_dfm, xzyz_cell_number, index_veg_cel,list_read_
                 # Calculate the d_0 from height of the tree, wait for Uwe Grueter Confirmation
                 # height is adjusted from the water depth
                 Vm_trunk = np.pi/4*(read_data_subset['dbh_cm']/100)**2*water_depth #m^3 
-                Am_trunk = (read_data_subset['dbh_cm']/100)*water_depth #m^3 
+                Am_trunk = (avicennia['dbh_cm']/100)*water_depth #m^3 
             
                 # sum of the obstacle volume
-                Vm = Vm_pneu_total + Vm_trunk #m^3
+                Vm_avc = Vm_pneu_total + Vm_trunk #m^3
                 # sum of the obstacle area
-                Am = Am_pneu_total + Am_trunk#m^2
-            
+                Am_avc = Am_pneu_total + Am_trunk#m^2
+                
+                ## Contribution of Rhizopora
+                
+                RhDFrm['HRmax'] = (7.56*RhDFrm['dbh_cm']/100) + 0.5
+                RhDFrm['N'] = np.ceil(3.15*RhDFrm['HRmax']**2 + 5.3*RhDFrm['HRmax'] + 0.114)
+                RhDFrm['intervalRoot']= (RhDFrm['HRmax']-0.25) / (RhDFrm['N'] -1) # this is the interval of each root shoots + 0.25
+                RhDFrm['HR'] = 0.25+RhDFrm['intervalRoot']
+                RhDFrm['x2'] = 1.88*RhDFrm['HR'] - 0.432
+                RhDFrm['rootDia'] = 0.04*RhDFrm['dbh_cm']/100 + 0.005*RhDFrm['HR'] + 0.024
+                RhDFrm['thetaRoot'] = 20.88*RhDFrm['HR'] - 46.87 # in degrees 
+                
+                # HRmax = RhDFrm['HRmax'].to_numpy()
+                HR = RhDFrm['HR'].to_numpy()
+                x2 = RhDFrm['x2'].to_numpy()
+                rootDia = RhDFrm['rootDia'].to_numpy()
+                RhDBH = RhDFrm['dbh_cm'].to_numpy()/100
+                
+                a = []
+                b = []
+                for i in np.arange(len(HR)):
+                    acalc, bcalc = calc_ab(HR[i], x2[i])
+                    
+                    a = np.append(a, acalc)
+                    b = np.append(b, bcalc)
+                
+                L = []  ## Ini yang butuh water level
+                for i in np.arange(len(x2)):
+                    Lcalc = calc_L_vol(x2[i], HR[i], a[i], b[i], water_depth)
+                    
+                    L = np.append(L, Lcalc)
+                
+                Vol_Root = L*(rootDia/2)**2*np.pi
+                Area_Root = L*rootDia
+                Vm_stem = []
+                Am_stem = []
+                for i in np.arange(len(RhDBH)):
+                    if RhDBH[i] > water_depth:
+                        Vm_stemp = 0
+                        Am_stemp = 0
+                    else:
+                        Vm_stemp = np.pi/4*(RhDBH[i])**2*water_depth #m^3 
+                        Am_stemp = RhDBH[i]*water_depth #m^3 
+                    
+                    Vm_stem = np.append(Vm_stem, Vm_stemp)
+                    Am_stem = np.append(Am_stem, Am_stemp)
+                
+                # sum of the obstacle volume
+                Vm_rhiz = pd.Series(Vol_Root + Vm_stem) #m^3
+                # sum of the obstacle area
+                Am_rhiz = pd.Series(Area_Root + Am_stem)#m^2
+                
+                Vm_tot = Vm_avc.append(Vm_rhiz, ignore_index=True)
+                Am_tot = Am_avc.append(Am_rhiz, ignore_index=True)
                 # Volume of the control water
             
                 V = cell_area*water_depth
             
                 # Characteristic Length (m)
-                L = (V-Vm)/Am
+                L = (V - Vm_tot) / Am_tot
                 # Cd_no = 0.005 # assume drag coefficient without the presence of vegetation
                 e_drag = 5 # set to 5m to obtain realistic value for Cd
             
@@ -1426,9 +1832,9 @@ def New_clipSHPcreateXLSfromGPD(file_tile, save_tiled_trees, shp_source, species
         height_m = tree_point['height_m'] #change for independent files or standardized the shp
         rbh_m = tree_point['rbh_m']
         id_id = np.arange(len(posX))
-        speciesName = np.ones(len(posX))*1 #if only one species is recorded, however it is better to place this in shapefile
+        speciesName = tree_point['Species']
         types_species = id_id+1 # this variable starts from 1 to N+1
-        # shiftedBelowPos = np.ones(len(posX))*1
+        shiftedBelowPos = np.ones(len(posX))*1
         age = tree_point['age']
             
         # Create Panda Dataframe with Header
@@ -1439,13 +1845,15 @@ def New_clipSHPcreateXLSfromGPD(file_tile, save_tiled_trees, shp_source, species
                            'posY' : posY,
                            'shiftedPosX' : posX,
                            'shiftedPosY' : posY,
-                           'shiftedBelowPosX' : speciesName,
-                           'shiftedBelowPosY' : speciesName,
+                           'shiftedBelowPosX' : shiftedBelowPos,
+                           'shiftedBelowPosY' : shiftedBelowPos,
                            'age' : age,
                            'rbh_m' : rbh_m,
                            'newRbh_m' : rbh_m,
                            'height_m' : height_m,
                            'newHeight_m' : height_m})
+        for nn in range(len(species_name)):
+            df.loc[df["speciesName"] == species_name[nn], "speciesName"] = nn+1
         
         # Create a Pandas Excel writer using XlsxWriter as the engine.
         xls_name = Path(filepath).stem+'_trees_input'+'.xls'
@@ -1454,8 +1862,8 @@ def New_clipSHPcreateXLSfromGPD(file_tile, save_tiled_trees, shp_source, species
         # Convert the dataframe to an XlsxWriter Excel object. Note that we turn off
         # the default header and skip one row to allow us to insert a user defined
         # header.
-        startrowis = 4
-        
+        startrowis = 3+len(species_name)
+    
         with pd.ExcelWriter(xls_loc) as writer:
             df.to_excel(writer, sheet_name='Sheet1', index=False, startrow=startrowis, header=True)
         
@@ -1464,12 +1872,13 @@ def New_clipSHPcreateXLSfromGPD(file_tile, save_tiled_trees, shp_source, species
         # Insert the value in worksheet
         s = wb.get_sheet(0)
         s.write(0,0,'def')
-        s.write(1,0, 1)
-        s.write(1,1, species_name)
-        s.write(2,0, '/def')
-        s.write(3,0, 'values')
-            # position_last = start the data + 1 (since it contains header) 
-        #  + length of data
+            
+        for nn in range(len(species_name)):
+            s.write(nn+1,0, nn+1)
+            s.write(nn+1,1, species_name[nn])
+        s.write(len(species_name)+1,0, '/def')
+        s.write(len(species_name)+2,0, 'values')
+            
         position_last = startrowis + 1 + len(posX)
         s.write(position_last,0, '/values')
         wb.save(xls_loc)
@@ -1537,10 +1946,10 @@ def calcLevelCell (xyzw_cell_number, model_dfm, index_veg_cel, xyzw_nodes, xk, y
             y_range = [np.min(nodes_pos[1]), np.max(nodes_pos[1])]
                             
             # subsetting pandas 
-            read_data_subset = read_data[(read_data['GeoRefPosX'] >= x_range[0]) & 
-                                         (read_data['GeoRefPosX'] <= x_range[1])]
-            read_data_subset = read_data_subset[(read_data_subset['GeoRefPosY'] >= y_range[0]) & 
-                                                (read_data_subset['GeoRefPosY'] <= y_range[1])]
+            read_data_subset = read_data.loc[(((read_data['GeoRefPosX'] >= x_range[0]) 
+                            & (read_data['GeoRefPosX'] <= x_range[1])) 
+                                          & ((read_data['GeoRefPosY'] >= y_range[0]) 
+                                             & (read_data['GeoRefPosY'] <= y_range[1])))]
             
             bgb = 1.28 *  read_data_subset['dbh_cm']**1.17
             bgb_kg_total = bgb.sum()
@@ -1558,7 +1967,7 @@ def calcLevelCellCdveg (model_dfm, ugrid_all, xzyz_cell_number, index_veg_cel, r
     bulk_density = 1.1 ##gr/cm^3
     
     ba = model_dfm.get_var('ba') #surface area of the boxes (bottom area) {"location": "face", "shape": ["ndx"]}
-    data_verts = data_verts = ugrid_all.verts
+    data_verts = ugrid_all.verts
     
     bl_val = np.empty((model_dfm.get_var('bl').shape[0],0))
     for row in range(len(xzyz_cell_number)):
@@ -1568,10 +1977,10 @@ def calcLevelCellCdveg (model_dfm, ugrid_all, xzyz_cell_number, index_veg_cel, r
             position = xzyz_cell_number[row,2].astype(int)
             aa = data_verts[position,:,:]
             # subsetting pandas 
-            read_data_subset = read_data[(read_data['GeoRefPosX'] >= min(aa[:,0])) & 
-                                         (read_data['GeoRefPosX'] <= max(aa[:,0]))]
-            read_data_subset = read_data_subset[(read_data_subset['GeoRefPosY'] >= min(aa[:,1])) & 
-                                                (read_data_subset['GeoRefPosY'] <= max(aa[:,1]))]
+            read_data_subset = read_data.loc[(((read_data['GeoRefPosX'] >= min(aa[:,0])) 
+                            & (read_data['GeoRefPosX'] <= max(aa[:,0]))) 
+                                          & ((read_data['GeoRefPosY'] >= min(aa[:,1])) 
+                                             & (read_data['GeoRefPosY'] <= max(aa[:,1]))))]
             
             bgb = 1.28 *  read_data_subset['dbh_cm']**1.17
             bgb_kg_total = bgb.sum()
@@ -1611,10 +2020,10 @@ def definePropVeg(xzyz_cell_number, model_dfm, ugrid_all, index_veg_cel, read_da
             position = xzyz_cell_number[row,2].astype(int)
             aa = data_verts[position,:,:]
             # subsetting pandas 
-            read_data_subset = read_data[(read_data['GeoRefPosX'] >= min(aa[:,0])) & 
-                                         (read_data['GeoRefPosX'] <= max(aa[:,0]))]
-            read_data_subset = read_data_subset[(read_data_subset['GeoRefPosY'] >= min(aa[:,1])) & 
-                                                (read_data_subset['GeoRefPosY'] <= max(aa[:,1]))]
+            read_data_subset = read_data.loc[(((read_data['GeoRefPosX'] >= min(aa[:,0])) 
+                            & (read_data['GeoRefPosX'] <= max(aa[:,0]))) 
+                                          & ((read_data['GeoRefPosY'] >= min(aa[:,1])) 
+                                             & (read_data['GeoRefPosY'] <= max(aa[:,1]))))]
            
             rnveg_calc = read_data_subset.Height_cm.notnull().sum()/cell_area
             diaveg_calc = read_data_subset.dbh_cm.quantile(0.8)/100
@@ -1629,6 +2038,127 @@ def definePropVeg(xzyz_cell_number, model_dfm, ugrid_all, index_veg_cel, read_da
     stemheight_coeff = np.append(stemheight_coeff, addition_veg)
     
     return rnveg_coeff, diaveg_coeff, stemheight_coeff
+
+def n_definePropVeg(avicennia_pr, RhDFrm_pr, vol_func, model_dfm):
+    avicennia = avicennia_pr.copy()
+    RhDFrm = RhDFrm_pr.copy()
+    
+    ba = model_dfm.get_var('ba') #surface area of the boxes (bottom area) {"location": "face", "shape": ["ndx"]}
+    
+    lookup_area = pd.DataFrame({'cell_number':list(range(len(ba))),
+                               'cell_area':ba,
+                               })
+    try:
+        # avicennia
+        val_ba_avc = np.vstack(avicennia['cell_number'].values)
+        bound_ba_avc = lookup_area['cell_number'].values == val_ba_avc
+        avicennia['cell_area'] = np.dot(bound_ba_avc, lookup_area['cell_area'])
+    except:
+        print('no avicennia')
+    try:
+        # rhizopora
+        val_ba_rzp = np.vstack(RhDFrm['cell_number'].values)
+        bound_ba_rzp = lookup_area['cell_number'].values == val_ba_rzp
+        RhDFrm['cell_area'] = np.dot(bound_ba_rzp, lookup_area['cell_area'])
+    except:
+        print('no avicennia')
+        
+    d_pneu = 0.01 # m
+    h_pneu = 0.15 # m
+    
+    # define HRmax
+    RhDFrm['HRmax'] = ((7.56*RhDFrm['dbh_cm']/100) + 0.5).astype(float)
+    
+    ## define water depth as the limit
+    avicennia['water_depth'] = h_pneu
+    RhDFrm['water_depth'] = RhDFrm['HRmax']
+    
+    ## calculate contribution from avicennia
+    try:
+        cond_avc = [
+            (avicennia['water_depth'].values < h_pneu),
+            (avicennia['water_depth'].values >= h_pneu)
+            ]
+        val_avc = [
+            np.pi*d_pneu*avicennia['water_depth'].values/12,
+            np.pi*d_pneu*h_pneu/12
+            ]
+    
+        avicennia['Vm_pneu'] = np.select(cond_avc, val_avc, default='NA').astype(float)
+    
+        avicennia['Vm_pneu_total'] = avicennia['Vm_pneu']*avicennia['N_pneu']
+        # avicennia['Am_pneu_total'] = d_pneu*h_pneu*avicennia['N_pneu']
+    
+        # Calculate the d_0 from height of the tree, wait for Uwe Grueter Confirmation
+        # height is adjusted from the water depth
+        avicennia['Vm_trunk'] = np.pi/4*(avicennia['dbh_cm']/100)**2*avicennia['water_depth']#m^3 
+        # avicennia['Am_trunk'] = (avicennia['dbh_cm']/100)*avicennia['water_depth'] #m^3 
+    
+        # sum of the obstacle volume
+        avicennia['Vm_avc'] = avicennia['Vm_pneu_total'] + avicennia['Vm_trunk'] #m^3
+        # sum of the obstacle area
+        # avicennia['Am_avc'] = avicennia['Am_pneu_total'] + avicennia['Am_trunk']#m^2  
+        avicennia['nmang_eq_avc'] = np.round(avicennia['Vm_avc']  / avicennia['Vm_trunk']) + 1
+    except:
+        print('no avicennia')
+        
+    ## calculate contribution from rhizopora
+    try:           
+        # RhDFrm['Vm_rhiz'] = g_func(RhDFrm['water_depth'], RhDFrm['dbh_cm']) #water depth(m), dbh(cm)
+        
+        data_array = RhDFrm[["water_depth", "dbh_cm"]].to_numpy()
+        def calc_vol(val):
+            return  vol_func(val[0], val[1])
+        # def calc_are(val):
+        #     return  area_func(val[0], val[1])
+        
+        RhDFrm['Vm_rhiz'] = np.apply_along_axis(calc_vol, axis=1, arr=data_array)
+        RhDFrm['Vm_trunk'] = np.pi/4*(RhDFrm['dbh_cm']/100)**2*RhDFrm['water_depth']#m^3 
+        RhDFrm['stilt_roots'] = RhDFrm['Vm_rhiz'] - RhDFrm['Vm_trunk']
+        RhDFrm['nmang_eq_rzp'] = np.round(RhDFrm['stilt_roots'] / RhDFrm['Vm_trunk']) + 1
+        # RhDFrm['Am_rhiz'] = np.apply_along_axis(calc_are, axis=1, arr=data_array)
+    except:
+        print('no rhizopora')
+        
+    try:
+        avicennia_sum = avicennia.groupby(by='cell_number')['nmang_eq_avc'].sum()
+        avicennia_dia = avicennia.groupby(by='cell_number')['dbh_cm'].quantile(q=0.8)
+        avicennia_height = avicennia.groupby(by='cell_number')['Height_cm'].quantile(q=0.8)
+    except:
+        print('no avicennia')
+    try:
+        rhizopora_sum = RhDFrm.groupby(by='cell_number')['nmang_eq_rzp'].sum()
+        rhizopora_dia = RhDFrm.groupby(by='cell_number')['dbh_cm'].quantile(q=0.8)
+        rhizopora_height = RhDFrm.groupby(by='cell_number')['Height_cm'].quantile(q=0.8)
+        
+        veg_contribute = pd.concat([avicennia_sum, rhizopora_sum], axis=1)
+        
+    except:
+        print('no rhizopora')
+    
+    veg_prop = pd.concat([lookup_area, veg_contribute], axis=1)
+    veg_prop['rnveg_calc'] = (veg_prop['nmang_eq_avc'] + veg_prop['nmang_eq_rzp']) / veg_prop['cell_area']
+    rnveg_calc = veg_prop['rnveg_calc'].fillna(0).to_numpy()
+    
+    diaveg_is = pd.concat([avicennia_dia, rhizopora_dia], axis=1)
+    diaveg_is.columns = ['avicennia_dbh_cm', 'rhizopora_dbh_cm']
+    diaveg_precalc = diaveg_is.quantile(q=0.8, axis=1)
+    
+    stemheight_is = pd.concat([avicennia_height, rhizopora_height], axis=1)
+    stemheight_is.columns = ['avicennia_height_cm', 'rhizopora_height_cm']
+    stemheight_precalc = stemheight_is.quantile(q=0.8, axis=1)
+    
+    diaveg_calc = pd.concat([lookup_area, diaveg_precalc], axis=1)
+    diaveg_calc = diaveg_calc.fillna(0)
+    diaveg_calc.columns = ['cell_number', 'cell_area', 'diaveg']
+    diaveg_calc_cell = (diaveg_calc['diaveg']/100).to_numpy()
+    
+    stemheight_calc = pd.concat([lookup_area, stemheight_precalc], axis=1)
+    stemheight_calc = stemheight_calc.fillna(0)
+    stemheight_calc.columns = ['cell_number', 'cell_area', 'stemheight']
+    stemheight_calc_cell = (stemheight_calc['stemheight']/100).to_numpy()
+    
+    return rnveg_calc, diaveg_calc_cell, stemheight_calc_cell
 
 def Calc_WoO(water_level, model_dfm, MorFac, coupling_period, woo_inun, LLWL):
     import copy           
@@ -1698,3 +2228,1028 @@ def Calc_WoO(water_level, model_dfm, MorFac, coupling_period, woo_inun, LLWL):
             surv_val[surv] = 0
             
     return med_h_wl, surv_val
+
+def fill_elev_base (model_dfm, ugrid_all, xzyz_cell_number, index_veg_cel, read_data):
+
+    data_verts = ugrid_all.verts
+    
+    # bl_val = np.empty((model_dfm.get_var('bl').shape[0],0))
+    bl_val = model_dfm.get_var('bl')
+    for row in range(len(xzyz_cell_number)):
+        if index_veg_cel[row] == 1: 
+            # print(row)
+            position = xzyz_cell_number[row,2].astype(int)
+            aa = data_verts[position,:,:]
+            # subsetting pandas 
+            read_data_subset = read_data.loc[(((read_data['GeoRefPosX'] >= min(aa[:,0])) 
+                            & (read_data['GeoRefPosX'] <= max(aa[:,0]))) 
+                                          & ((read_data['GeoRefPosY'] >= min(aa[:,1])) 
+                                             & (read_data['GeoRefPosY'] <= max(aa[:,1]))))]
+            
+            # read_data_subset['elev_base'] = bl_val[row]
+            pos = read_data_subset.index.values.tolist()
+            read_data.loc[pos,'elev_base'] = bl_val[row]
+        else:
+            pass
+
+def fill_elev_sdlg (bed_lvl_init, ugrid_all, xzyz_cell_number, index_veg_cel, read_data):
+
+    data_verts = ugrid_all.verts
+    
+    # bl_val = np.empty((model_dfm.get_var('bl').shape[0],0))
+    for row in range(len(xzyz_cell_number)):
+        if index_veg_cel[row] == 1: 
+            # print(row)
+            position = xzyz_cell_number[row,2].astype(int)
+            aa = data_verts[position,:,:]
+            # subsetting pandas 
+            read_data_subset = read_data.loc[(((read_data['GeoRefPosX'] >= min(aa[:,0])) 
+                            & (read_data['GeoRefPosX'] <= max(aa[:,0]))) 
+                                          & ((read_data['GeoRefPosY'] >= min(aa[:,1])) 
+                                             & (read_data['GeoRefPosY'] <= max(aa[:,1]))))]
+            
+            # read_data_subset['elev_base'] = bl_val[row]
+            pos = read_data_subset.index.values.tolist()
+            read_data.loc[pos,'elev_base'] = bed_lvl_init[row]
+        else:
+            pass
+
+## pakai function ini di atas sendiri, muncul di setiap coupling saja
+def add_cell_number(ugrid_all, xzyz_cell_number, read_data):
+    # this function is to predefine the subset before calculate drag
+    read_data_copy = read_data.copy()
+    read_data_copy['cell_number'] = np.nan
+    data_verts = ugrid_all.verts    
+    for row in range(len(xzyz_cell_number)):
+        position = xzyz_cell_number[row,2].astype(int)
+        aa = data_verts[position,:,:]
+        
+        read_data_copy['cell_id'] = ((read_data_copy['GeoRefPosX'] >= min(aa[:,0])) 
+                            & (read_data_copy['GeoRefPosX'] <= max(aa[:,0]))) & ((read_data_copy['GeoRefPosY'] >= min(aa[:,1])) 
+                                             & (read_data_copy['GeoRefPosY'] <= max(aa[:,1])))
+        read_data_copy['cell_number'] = np.where(read_data_copy['cell_id'] == True, row, read_data_copy['cell_number'])
+    
+    return read_data_copy
+
+def newCalcDraginVectCdveg(model_dfm, ugrid_all, xzyz_cell_number, read_data, index_veg_cel):
+       
+    # def calc_F_vol(a,b,x):
+    #         F = (((2*a*x + b) * np.sqrt(1 + (2*a*x + b)**2)) / 4*a) + \
+    #             ((np.log((2*a*x + b) + np.sqrt(1 + (2*a*x + b)**2)))/4*a)
+            
+    #         return F
+        
+    # def calc_L_vol(x2, HR, a, b, D):
+    #     if D < HR:
+    #         x1 = (-b-np.sqrt(b**2-4*a*(HR-D)))/2*a
+    #         F1 = calc_F_vol(a,b,x1)
+    #         F2 = calc_F_vol(a,b,x2)
+    #         L = F2-F1
+    #     else:
+    #         F2 = calc_F_vol(a,b,x2)
+    #         F0 = calc_F_vol(a,b,0)
+    #         L = F2-F0
+        
+    #     return L
+    # read_data_copy = read_data.copy()
+                  
+    read_data_copy = read_data.copy()
+    ### define cell area and water depth
+    ba = model_dfm.get_var('ba') #surface area of the boxes (bottom area) {"location": "face", "shape": ["ndx"]}
+    hs = model_dfm.get_var('hs') #water depth at the end of timestep {"location": "face", "shape": ["ndx"]}
+    
+    lookup_area = pd.DataFrame({'cell_number':list(range(len(ba))),
+                           'cell_area':ba,
+                           })
+    lookup_hs = pd.DataFrame({'cell_number':list(range(len(ba))),
+                           'water_depth':hs,
+                           })
+    
+    val_ba = np.vstack(read_data_copy['cell_number'].values)
+    bound_ba = lookup_area['cell_number'].values == val_ba
+    read_data_copy['cell_area'] = np.dot(bound_ba, lookup_area['cell_area'])
+    
+    bound_hs = lookup_hs['cell_number'].values == val_ba
+    read_data_copy['water_depth'] = np.dot(bound_hs, lookup_hs['water_depth'])
+    
+    ### calculate for each species
+    ## Avicennia
+    Cd_no = 0.005 # assume drag coefficient without the presence of vegetation
+
+    d_pneu = 0.01 # m
+    h_pneu = 0.15 # m
+    f_pneu = 0.3 # const in van Maanen
+    D05_pneu = 20 # const in van Maanen
+    
+    avicennia = (read_data_copy.loc[read_data_copy['Species']=='Avicennia_marina']).copy() # for avicennia
+    avicennia.drop(avicennia.loc[avicennia['water_depth']==0].index, inplace=True)
+    # Volume of the aerial roots
+    avicennia['N_pneu'] = 10025*(1/(1+np.exp(f_pneu*(D05_pneu-avicennia['dbh_cm']))))
+              
+    # if function to adjust the h_pneu for Avicennia
+    # this equation is from Du, Qin, et al. 2021
+    cond_avc = [
+        (avicennia['water_depth'].values < h_pneu),
+        (avicennia['water_depth'].values >= h_pneu)
+        ]
+    val_avc = [
+        np.pi*d_pneu*avicennia['water_depth'].values/12,
+        np.pi*d_pneu*h_pneu/12
+        ]
+    
+    avicennia['Vm_pneu'] = np.select(cond_avc, val_avc, default='NA').astype(float)
+    
+    avicennia['Vm_pneu_total'] = avicennia['Vm_pneu']*avicennia['N_pneu']
+    avicennia['Am_pneu_total'] = d_pneu*h_pneu*avicennia['N_pneu']
+    
+    # Calculate the d_0 from height of the tree, wait for Uwe Grueter Confirmation
+    # height is adjusted from the water depth
+    avicennia['Vm_trunk'] = np.pi/4*(avicennia['dbh_cm']/100)**2*avicennia['water_depth']#m^3 
+    avicennia['Am_trunk'] = (avicennia['dbh_cm']/100)*avicennia['water_depth'] #m^3 
+    
+    # sum of the obstacle volume
+    avicennia['Vm_avc'] = avicennia['Vm_pneu_total'] + avicennia['Vm_trunk'] #m^3
+    # sum of the obstacle area
+    avicennia['Am_avc'] = avicennia['Am_pneu_total'] + avicennia['Am_trunk']#m^2  
+    
+    ### Contribution Rhizopora    
+    RhDFrm = (read_data_copy.loc[read_data_copy['Species']=='Rhizopora_apiculata']).copy() # for Rhizopora
+    RhDFrm.drop(RhDFrm.loc[RhDFrm['water_depth']==0].index, inplace=True)
+    
+    RhDFrm['HRmax'] = ((7.56*RhDFrm['dbh_cm']/100) + 0.5).astype(float)
+    RhDFrm['N'] = np.ceil(3.15*RhDFrm['HRmax']**2 + 5.3*RhDFrm['HRmax'] + 0.114).astype(int)
+    RhDFrm['HR_interval'] = (RhDFrm['HRmax'] -0.25)/(RhDFrm['N']-1)
+    # create linspace of root height as list
+    RhDFrm['HR_i'] = RhDFrm.apply(lambda x: np.linspace(0.25,  x['HRmax'], x['N']), axis=1)
+    
+    # explode the DataFrame
+    RhDFrm_ex = RhDFrm.explode('HR_i')
+    RhDFrm_ex['HR_i'] = RhDFrm_ex['HR_i'].astype(float)
+    # calculate as normally
+    RhDFrm_ex['x2'] = (1.88*RhDFrm_ex['HR_i'])-0.432
+    RhDFrm_ex['rootDia'] = (0.04*RhDFrm_ex['dbh_cm']/100) + (0.005*RhDFrm_ex['HR_i']) + 0.024
+    RhDFrm_ex['thetaRoot'] = 20.88*RhDFrm_ex['HR_i'] - 46.87 # in degrees
+    RhDFrm_ex['b'] = np.where(RhDFrm_ex['HR_i'] > 2.24,
+        0,
+        np.tan((20.88*RhDFrm_ex['HR_i'] - 46.87)*np.pi/180)
+        )
+    RhDFrm_ex['a'] = np.where(RhDFrm_ex['HR_i'] > 2.24, 
+             -(RhDFrm_ex['HR_i']/RhDFrm_ex['x2']**2), 
+             -((RhDFrm_ex['b']*RhDFrm_ex['x2']+RhDFrm_ex['HR_i'])/RhDFrm_ex['x2']**2)
+             )
+    
+    RhDFrm_ex['x1'] = np.where(RhDFrm_ex['water_depth'] < RhDFrm_ex['HR_i'],
+        (-RhDFrm_ex['b']-np.sqrt(RhDFrm_ex['b']**2-(4*RhDFrm_ex['a']*(RhDFrm_ex['HR_i']-RhDFrm_ex['water_depth']))))/(2*RhDFrm_ex['a']),
+        0
+        )
+    
+    calc_L_array = RhDFrm_ex[["a", "b", "x1", "x2"]].to_numpy()
+    def calc_L(x):
+        g = lambda f, a,b: np.sqrt(1+((2*a*f)+b)**2)
+        return quad(g, x[2],x[3], args=(x[0],x[1]))[0]
+    RhDFrm_ex['L'] = np.apply_along_axis(calc_L, axis=1, arr=calc_L_array)
+    
+    RhDFrm_ex['VR_i'] = RhDFrm_ex['L']*(RhDFrm_ex['rootDia']/2)**2
+    RhDFrm_ex['AR_i'] = RhDFrm_ex['L']*RhDFrm_ex['rootDia']
+    RhDFrm_grouped = RhDFrm_ex.groupby(by='Unnamed: 0')[['VR_i','AR_i']].sum().to_numpy()
+    
+    #add the calculated V and A to main DataFrame
+    RhDFrm['Vol_Root'] = RhDFrm_grouped[:,0].tolist()
+    RhDFrm['Area_Root'] = RhDFrm_grouped[:,1].tolist()
+    # cond_rzp = [
+    #     (RhDFrm['water_depth'].values < RhDFrm['HR']),
+    #     (RhDFrm['water_depth'].values >= RhDFrm['HR'])
+    #     ]
+    # # check x1
+    # try:
+    #     answer_x1 = [
+    #         (-RhDFrm['b']-np.sqrt(RhDFrm['b']**2-4*RhDFrm['a']*(RhDFrm['HR']-RhDFrm['water_depth'])))/2*RhDFrm['a'],
+    #         np.nan
+    #         ]
+    #     RhDFrm['x1'] = np.select(cond_rzp, answer_x1, default='NA').astype(float)
+    # except:
+    #     RhDFrm['x1'] = np.nan
+    # #check F1
+    # try:
+    #     answer_F1 = [
+    #         calc_F_vol(RhDFrm['a'],RhDFrm['b'],RhDFrm['x1']),
+    #         np.nan
+    #         ]
+        
+    #     RhDFrm['F1'] = np.select(cond_rzp, answer_F1, default='NA').astype(float)
+    # except:
+    #     RhDFrm['F1'] = np.nan
+    
+    # #check F2
+    # RhDFrm['F2'] = calc_F_vol(RhDFrm['a'],RhDFrm['b'],RhDFrm['x2'])
+    
+    # #check F0
+    # try:
+    #     answer_F0 = [
+    #         np.nan,
+    #         calc_F_vol(RhDFrm['a'],RhDFrm['b'],0)
+    #         ]
+    #     RhDFrm['F0'] = np.select(cond_rzp, answer_F0, default='NA').astype(float)
+    # except:
+    #     RhDFrm['F0'] = np.nan
+    # #Check L
+    # answer_L = [
+    #     RhDFrm['F2']-RhDFrm['F1'],
+    #     RhDFrm['F2']-RhDFrm['F0']
+    #     ]
+    # RhDFrm['L'] = np.select(cond_rzp, answer_L, default='NA').astype(float)
+    
+    # RhDFrm['Vol_Root'] = RhDFrm['L']*(RhDFrm['rootDia']/2)**2*np.pi
+    # RhDFrm['Area_Root'] = RhDFrm['L']*RhDFrm['rootDia']
+    
+    cond_VmAm = [
+        (RhDFrm['dbh_cm']/100 > RhDFrm['water_depth']),
+        (RhDFrm['dbh_cm']/100 <= RhDFrm['water_depth'])
+        ]
+    try:
+        answer_Vm = [
+            0,
+            np.pi/4*(RhDFrm['dbh_cm']/100)**2*RhDFrm['water_depth'] #m^3 
+            ]
+            
+        RhDFrm['Vm_stem'] = np.select(cond_VmAm, answer_Vm, default='NA').astype(float)
+    except:
+        RhDFrm['Vm_stem'] = np.nan
+    
+    try:
+        answer_Am = [
+            0,
+            RhDFrm['dbh_cm']/100*RhDFrm['water_depth'] #m^3 
+            ]
+            
+        RhDFrm['Am_stem'] = np.select(cond_VmAm, answer_Am, default='NA').astype(float)
+    except:
+        RhDFrm['Am_stem'] = np.nan
+    
+    
+    RhDFrm['Vm_rhiz'] = RhDFrm['Vol_Root'] + RhDFrm['Vm_stem']
+    RhDFrm['Am_rhiz'] = RhDFrm['Area_Root'] + RhDFrm['Am_stem']
+    
+    ## Groupby and sum of the total volume-area
+    avicennia_sum = avicennia.groupby(by='cell_number')[['Vm_avc','Am_avc']].sum()
+    rhizopora_sum = RhDFrm.groupby(by='cell_number')[['Vm_rhiz','Am_rhiz']].sum()
+    
+    veg_contribute = pd.concat([avicennia_sum, rhizopora_sum], axis=1)
+    veg_contribute['V_total'] = veg_contribute[["Vm_avc", "Vm_rhiz"]].sum(axis=1)
+    veg_contribute['A_total'] = veg_contribute[["Am_avc", "Am_rhiz"]].sum(axis=1)
+    
+    ## Place the Veg Contribute to the same DataFrame with ba and hs
+    veg_ba_hs = pd.concat([lookup_hs, lookup_area, veg_contribute], axis=1)
+    e_drag = 5 # set to 5m to obtain realistic value for Cd
+    veg_ba_hs['V'] = veg_ba_hs['cell_area']*veg_ba_hs['water_depth']
+    veg_ba_hs['L'] = (veg_ba_hs['V'] - veg_ba_hs['V_total']) / veg_ba_hs['A_total']
+    veg_ba_hs['Cdcalc'] = Cd_no + (e_drag/ veg_ba_hs['L'])
+    veg_ba_hs['Cdcalc'] = veg_ba_hs['Cdcalc'].fillna(Cd_no)
+    
+    ## Place the calculated Cdcalc
+    drag_coeff = veg_ba_hs['Cdcalc'].values
+    
+    # ### Get the calculation per cell number
+    # avicennia['V'] = avicennia['cell_area']*avicennia['water_depth']
+    # RhDFrm['V'] = RhDFrm['cell_area']*RhDFrm['water_depth']
+    
+    # # Characteristic Length (m)
+    # avicennia['L'] = (avicennia['V'] - avicennia['Vm_avc']) / avicennia['Am_avc']
+    # RhDFrm['L'] = (RhDFrm['V'] - RhDFrm['Vm_rhiz']) / RhDFrm['Am_rhiz']
+    
+    # e_drag = 5 # set to 5m to obtain realistic value for Cd
+    
+    # # avicennia['Cdcalc'] = Cd_no + (e_drag/ avicennia['L'])
+    # avicennia['Cdcalc'] = np.where(avicennia['water_depth'] == 0, np.nan, 
+    #                                Cd_no + (e_drag/ avicennia['L']))
+    # # RhDFrm['Cdcalc'] = Cd_no + (e_drag/ RhDFrm['L'])
+    # RhDFrm['Cdcalc'] = np.where(RhDFrm['water_depth'] == 0, np.nan,
+    #                             Cd_no + (e_drag/ RhDFrm['L']))
+    
+    # ### Groupby and sum
+    # avc_grouped = avicennia.groupby(by='cell_number')['Cdcalc'].sum()
+    # rzp_grouped = RhDFrm.groupby(by='cell_number')['Cdcalc'].sum()
+    
+    # avc_grouped_filt = avc_grouped.dropna(axis = 0, how = 'all').replace(0, Cd_no)
+    # rzp_grouped_filt = rzp_grouped.dropna(axis = 0, how = 'all').replace(0, Cd_no)
+    
+    # ## No Veg ## masih belum bener
+    
+    # no_veg_cd = pd.Series(index_veg_cel, name='Cdcalc')\
+    #     .reset_index().rename(columns={'index': 'cell_number'}).set_index('cell_number')
+    # no_veg_cd_filt = no_veg_cd.loc[no_veg_cd["Cdcalc"] == 0 ].replace(0,Cd_no)
+    # no_veg_cd_filt = no_veg_cd_filt.squeeze()
+    
+    # ## Append All
+    # df_ar = avc_grouped_filt.append(rzp_grouped_filt, ignore_index=False)
+    # df_ar_no = df_ar.append(no_veg_cd_filt, ignore_index=False).sort_index()
+        
+    # drag_coeff = df_ar_no.values
+    
+    return drag_coeff
+
+def prepCalcDraginVect(model_dfm, read_data):
+    read_data_copy = read_data.copy()
+
+    ### Prepare for each species
+    ## Avicennia
+    f_pneu = 0.3 # const in van Maanen
+    D05_pneu = 20 # const in van Maanen
+
+    avicennia = (read_data_copy.loc[read_data_copy['Species']=='Avicennia_marina']).copy() # for avicennia
+    # avicennia.drop(avicennia.loc[avicennia['water_depth']==0].index, inplace=True)
+    # Volume of the aerial roots
+    avicennia['N_pneu'] = 10025*(1/(1+np.exp(f_pneu*(D05_pneu-avicennia['dbh_cm']))))
+
+    ## Rhizopora
+    RhDFrm = (read_data_copy.loc[read_data_copy['Species']=='Rhizopora_apiculata']).copy() # for Rhizopora
+    # RhDFrm.drop(RhDFrm.loc[RhDFrm['water_depth']==0].index, inplace=True)
+
+    RhDFrm['HRmax'] = ((7.56*RhDFrm['dbh_cm']/100) + 0.5).astype(float)
+    RhDFrm['N'] = np.ceil(3.15*RhDFrm['HRmax']**2 + 5.3*RhDFrm['HRmax'] + 0.114).astype(int)
+    RhDFrm['HR_interval'] = (RhDFrm['HRmax'] -0.25)/(RhDFrm['N']-1)
+    # create linspace of root height as list
+    RhDFrm['HR_i'] = RhDFrm.apply(lambda x: np.linspace(0.25,  x['HRmax'], x['N']), axis=1)
+    
+    return avicennia, RhDFrm
+
+def calcDraginVect_fromPrep(avicennia_pr, RhDFrm_pr, model_dfm):
+    
+    avicennia = avicennia_pr.copy()
+    RhDFrm = RhDFrm_pr.copy()
+
+    Cd_no = 0.005 # assume drag coefficient without the presence of vegetation
+
+    d_pneu = 0.01 # m
+    h_pneu = 0.15 # m
+
+    ba = model_dfm.get_var('ba') #surface area of the boxes (bottom area) {"location": "face", "shape": ["ndx"]}
+    hs = model_dfm.get_var('hs') #water depth at the end of timestep {"location": "face", "shape": ["ndx"]}
+
+    lookup_area = pd.DataFrame({'cell_number':list(range(len(ba))),
+                           'cell_area':ba,
+                           })
+    lookup_hs = pd.DataFrame({'cell_number':list(range(len(ba))),
+                           'water_depth':hs,
+                           })
+    ###
+    val_av = np.vstack(avicennia['cell_number'].values)
+    bound_hs = lookup_hs['cell_number'].values == val_av
+    avicennia['water_depth'] = np.dot(bound_hs, lookup_hs['water_depth'])
+
+    val_rz = np.vstack(RhDFrm['cell_number'].values)
+    bound_hs = lookup_hs['cell_number'].values == val_rz
+    RhDFrm['water_depth'] = np.dot(bound_hs, lookup_hs['water_depth'])
+
+    # drop based on 0 water level
+    avicennia.drop(avicennia.loc[avicennia['water_depth']==0].index, inplace=True)
+    RhDFrm.drop(RhDFrm.loc[RhDFrm['water_depth']==0].index, inplace=True)
+
+    ## Avicennia
+    # if function to adjust the h_pneu for Avicennia
+    # this equation is from Du, Qin, et al. 2021
+    cond_avc = [
+        (avicennia['water_depth'].values < h_pneu),
+        (avicennia['water_depth'].values >= h_pneu)
+        ]
+    val_avc = [
+        np.pi*d_pneu*avicennia['water_depth'].values/12,
+        np.pi*d_pneu*h_pneu/12
+        ]
+
+    avicennia['Vm_pneu'] = np.select(cond_avc, val_avc, default='NA').astype(float)
+
+    avicennia['Vm_pneu_total'] = avicennia['Vm_pneu']*avicennia['N_pneu']
+    avicennia['Am_pneu_total'] = d_pneu*h_pneu*avicennia['N_pneu']
+
+    # Calculate the d_0 from height of the tree, wait for Uwe Grueter Confirmation
+    # height is adjusted from the water depth
+    avicennia['Vm_trunk'] = np.pi/4*(avicennia['dbh_cm']/100)**2*avicennia['water_depth']#m^3 
+    avicennia['Am_trunk'] = (avicennia['dbh_cm']/100)*avicennia['water_depth'] #m^3 
+
+    # sum of the obstacle volume
+    avicennia['Vm_avc'] = avicennia['Vm_pneu_total'] + avicennia['Vm_trunk'] #m^3
+    # sum of the obstacle area
+    avicennia['Am_avc'] = avicennia['Am_pneu_total'] + avicennia['Am_trunk']#m^2  
+
+    ## Rhizopora
+    # explode the DataFrame
+    RhDFrm_ex = RhDFrm.explode('HR_i')
+    RhDFrm_ex['HR_i'] = RhDFrm_ex['HR_i'].astype(float)
+    # calculate as normally
+    RhDFrm_ex['x2'] = (1.88*RhDFrm_ex['HR_i'])-0.432
+    RhDFrm_ex['rootDia'] = (0.04*RhDFrm_ex['dbh_cm']/100) + (0.005*RhDFrm_ex['HR_i']) + 0.024
+    RhDFrm_ex['thetaRoot'] = 20.88*RhDFrm_ex['HR_i'] - 46.87 # in degrees
+    RhDFrm_ex['b'] = np.where(RhDFrm_ex['HR_i'] > 2.24,
+        0,
+        np.tan((20.88*RhDFrm_ex['HR_i'] - 46.87)*np.pi/180)
+        )
+    RhDFrm_ex['a'] = np.where(RhDFrm_ex['HR_i'] > 2.24, 
+             -(RhDFrm_ex['HR_i']/RhDFrm_ex['x2']**2), 
+             -((RhDFrm_ex['b']*RhDFrm_ex['x2']+RhDFrm_ex['HR_i'])/RhDFrm_ex['x2']**2)
+             )
+    RhDFrm_ex['x1'] = np.where(RhDFrm_ex['water_depth'] < RhDFrm_ex['HR_i'],
+        (-RhDFrm_ex['b']-np.sqrt(RhDFrm_ex['b']**2-(4*RhDFrm_ex['a']*(RhDFrm_ex['HR_i']-RhDFrm_ex['water_depth']))))/(2*RhDFrm_ex['a']),
+        0
+        )
+    try:
+        calc_L_array = RhDFrm_ex[["a", "b", "x1", "x2"]].to_numpy()
+        def calc_L(x):
+            g = lambda f, a,b: np.sqrt(1+((2*a*f)+b)**2)
+            return quad(g, x[2],x[3], args=(x[0],x[1]))[0]
+        RhDFrm_ex['L'] = np.apply_along_axis(calc_L, axis=1, arr=calc_L_array)
+    
+        RhDFrm_ex['VR_i'] = RhDFrm_ex['L']*(RhDFrm_ex['rootDia']/2)**2
+        RhDFrm_ex['AR_i'] = RhDFrm_ex['L']*RhDFrm_ex['rootDia']
+        RhDFrm_grouped = RhDFrm_ex.groupby(by='Unnamed: 0')[['VR_i','AR_i']].sum().to_numpy()
+    
+        #add the calculated V and A to main DataFrame
+        RhDFrm['Vol_Root'] = RhDFrm_grouped[:,0].tolist()
+        RhDFrm['Area_Root'] = RhDFrm_grouped[:,1].tolist()
+    except:
+        print('initiate run all water level 0m')
+        
+    
+        cond_VmAm = [
+            (RhDFrm['dbh_cm']/100 > RhDFrm['water_depth']),
+            (RhDFrm['dbh_cm']/100 <= RhDFrm['water_depth'])
+            ]
+        try:
+            answer_Vm = [
+                0,
+                np.pi/4*(RhDFrm['dbh_cm']/100)**2*RhDFrm['water_depth'] #m^3 
+                ]
+                
+            RhDFrm['Vm_stem'] = np.select(cond_VmAm, answer_Vm, default='NA').astype(float)
+        except:
+            RhDFrm['Vm_stem'] = np.nan
+    
+        try:
+            answer_Am = [
+                0,
+                RhDFrm['dbh_cm']/100*RhDFrm['water_depth'] #m^3 
+                ]
+                
+            RhDFrm['Am_stem'] = np.select(cond_VmAm, answer_Am, default='NA').astype(float)
+        except:
+            RhDFrm['Am_stem'] = np.nan
+    
+    try:
+        RhDFrm['Vm_rhiz'] = RhDFrm['Vol_Root'] + RhDFrm['Vm_stem']
+        RhDFrm['Am_rhiz'] = RhDFrm['Area_Root'] + RhDFrm['Am_stem']
+    
+    except: # this is to compensate all 0m water during initial run
+        RhDFrm['Vm_rhiz'] = RhDFrm['Vm_stem']
+        RhDFrm['Am_rhiz'] = RhDFrm['Am_stem']    
+
+    ## Groupby and sum of the total volume-area
+    avicennia_sum = avicennia.groupby(by='cell_number')[['Vm_avc','Am_avc']].sum()
+    rhizopora_sum = RhDFrm.groupby(by='cell_number')[['Vm_rhiz','Am_rhiz']].sum()
+
+    veg_contribute = pd.concat([avicennia_sum, rhizopora_sum], axis=1)
+    veg_contribute['V_total'] = veg_contribute[["Vm_avc", "Vm_rhiz"]].sum(axis=1)
+    veg_contribute['A_total'] = veg_contribute[["Am_avc", "Am_rhiz"]].sum(axis=1)
+
+    ## Place the Veg Contribute to the same DataFrame with ba and hs
+    veg_ba_hs = pd.concat([lookup_hs, lookup_area, veg_contribute], axis=1)
+    e_drag = 5 # set to 5m to obtain realistic value for Cd
+    veg_ba_hs['V'] = veg_ba_hs['cell_area']*veg_ba_hs['water_depth']
+    veg_ba_hs['L'] = (veg_ba_hs['V'] - veg_ba_hs['V_total']) / veg_ba_hs['A_total']
+    veg_ba_hs['Cdcalc'] = Cd_no + (e_drag/ veg_ba_hs['L'])
+    veg_ba_hs['Cdcalc'] = veg_ba_hs['Cdcalc'].fillna(Cd_no)
+
+    ## Place the calculated Cdcalc
+    drag_coeff = veg_ba_hs['Cdcalc'].values
+    
+    return drag_coeff
+
+def n_prepCalcDraginVect(model_dfm, read_data):
+    read_data_copy = read_data.copy()
+
+    ### Prepare for each species
+    ## Avicennia
+    f_pneu = 0.3 # const in van Maanen
+    D05_pneu = 20 # const in van Maanen
+
+    avicennia = (read_data_copy.loc[read_data_copy['Species']=='Avicennia_marina']).copy() # for avicennia
+    # avicennia.drop(avicennia.loc[avicennia['water_depth']==0].index, inplace=True)
+    # Volume of the aerial roots
+    avicennia['N_pneu'] = 10025*(1/(1+np.exp(f_pneu*(D05_pneu-avicennia['dbh_cm']))))
+
+    ## Rhizopora
+    RhDFrm = (read_data_copy.loc[read_data_copy['Species']=='Rhizopora_apiculata']).copy() # for Rhizopora
+    # RhDFrm.drop(RhDFrm.loc[RhDFrm['water_depth']==0].index, inplace=True)
+
+    RhDFrm['HRmax'] = ((7.56*RhDFrm['dbh_cm']/100) + 0.5).astype(float)
+    RhDFrm['N'] = np.ceil(3.15*RhDFrm['HRmax']**2 + 5.3*RhDFrm['HRmax'] + 0.114).astype(int)
+    RhDFrm['HR_interval'] = (RhDFrm['HRmax'] -0.25)/(RhDFrm['N']-1)
+    
+    try:
+        # create linspace of root height as list
+        RhDFrm['HR_i'] = RhDFrm.apply(lambda x: np.linspace(0.25,  x['HRmax'], x['N']), axis=1)
+        
+        RhDFrm_ex = RhDFrm.explode('HR_i')
+        RhDFrm_ex['HR_i'] = RhDFrm_ex['HR_i'].astype(float)
+        # calculate as normally
+        RhDFrm_ex['x2'] = (1.88*RhDFrm_ex['HR_i'])-0.432
+        RhDFrm_ex['rootDia'] = (0.04*RhDFrm_ex['dbh_cm']/100) + (0.005*RhDFrm_ex['HR_i']) + 0.024
+        RhDFrm_ex['thetaRoot'] = 20.88*RhDFrm_ex['HR_i'] - 46.87 # in degrees
+        RhDFrm_ex['b'] = np.where(RhDFrm_ex['HR_i'] > 2.24,
+            0,
+            np.tan((20.88*RhDFrm_ex['HR_i'] - 46.87)*np.pi/180)
+            )
+        RhDFrm_ex['a'] = np.where(RhDFrm_ex['HR_i'] > 2.24, 
+                 -(RhDFrm_ex['HR_i']/RhDFrm_ex['x2']**2), 
+                 -((RhDFrm_ex['b']*RhDFrm_ex['x2']+RhDFrm_ex['HR_i'])/RhDFrm_ex['x2']**2)
+                 )
+    except:
+        print('no rhizopora')
+        RhDFrm_ex = RhDFrm.copy()
+        
+    return avicennia, RhDFrm, RhDFrm_ex
+
+def n_n_prepCalcDraginVect(read_data, SYS_APP):
+    read_data_copy = read_data.copy()
+
+    ### Prepare for each species
+    ## Avicennia
+    f_pneu = 0.3 # const in van Maanen
+    D05_pneu = 20 # const in van Maanen
+
+    avicennia = (read_data_copy.loc[read_data_copy['Species']=='Avicennia_marina']).copy() # for avicennia
+    # avicennia.drop(avicennia.loc[avicennia['water_depth']==0].index, inplace=True)
+    # Volume of the aerial roots
+    avicennia['N_pneu'] = 10025*(1/(1+np.exp(f_pneu*(D05_pneu-avicennia['dbh_cm']))))
+
+    ## Rhizopora
+    RhDFrm = (read_data_copy.loc[read_data_copy['Species']=='Rhizopora_apiculata']).copy() # for Rhizopora
+    # RhDFrm.drop(RhDFrm.loc[RhDFrm['water_depth']==0].index, inplace=True)
+    
+    lookup_volume = np.load(os.path.join(SYS_APP,'array_volume_rzp.npy')) 
+    lookup_area = np.load(os.path.join(SYS_APP,'array_area_rzp.npy')) 
+    dbh_is = np.arange(0.1,100.5,0.5) # dbh is from 0.1cm to 100cm with 0.5cm increment
+    wat_depth_is = np.arange(0.01,10.01,0.01) # water depth is from 0.01m to 10.01m with 0.01m increment
+
+    g = interp2d(wat_depth_is,dbh_is,lookup_volume, kind='linear')
+    h = interp2d(wat_depth_is,dbh_is,lookup_area, kind='linear')
+        
+    return avicennia, RhDFrm, g, h
+
+def n_calcDraginVect_fromPrep(avicennia_pr, RhDFrm_pr, RhDFrm_pr_ex, model_dfm, drag_coeff):
+    
+    avicennia = avicennia_pr.copy()
+    RhDFrm = RhDFrm_pr.copy()
+    RhDFrm_ex = RhDFrm_pr_ex.copy()
+
+    Cd_no = 0.005 # assume drag coefficient without the presence of vegetation
+
+    d_pneu = 0.01 # m
+    h_pneu = 0.15 # m
+
+    ba = model_dfm.get_var('ba') #surface area of the boxes (bottom area) {"location": "face", "shape": ["ndx"]}
+    hs = model_dfm.get_var('hs') #water depth at the end of timestep {"location": "face", "shape": ["ndx"]}
+
+    lookup_area = pd.DataFrame({'cell_number':list(range(len(ba))),
+                           'cell_area':ba,
+                           })
+    lookup_hs = pd.DataFrame({'cell_number':list(range(len(ba))),
+                           'water_depth':hs,
+                           })
+    ###
+    try:
+        val_av = np.vstack(avicennia['cell_number'].values)
+        bound_hs = lookup_hs['cell_number'].values == val_av
+        avicennia['water_depth'] = np.dot(bound_hs, lookup_hs['water_depth'])
+    except: 
+        print('no avicennia')
+    
+    try:
+        val_rz = np.vstack(RhDFrm_ex['cell_number'].values)
+        bound_hs = lookup_hs['cell_number'].values == val_rz
+        RhDFrm_ex['water_depth'] = np.dot(bound_hs, lookup_hs['water_depth'])
+        
+        val_rzo = np.vstack(RhDFrm['cell_number'].values)
+        bound_hs = lookup_hs['cell_number'].values == val_rzo
+        RhDFrm['water_depth'] = np.dot(bound_hs, lookup_hs['water_depth'])
+    except:
+        print('no rhizopora')
+
+    # drop based on 0 water level
+    try:
+        avicennia.drop(avicennia.loc[avicennia['water_depth']==0].index, inplace=True)
+    except:
+        print('no avicennia')
+    try:
+        RhDFrm_ex.drop(RhDFrm_ex.loc[RhDFrm_ex['water_depth']==0].index, inplace=True)
+    except:
+        print('no rhizopora')
+
+    ## Avicennia
+    # if function to adjust the h_pneu for Avicennia
+    # this equation is from Du, Qin, et al. 2021
+    try:
+        cond_avc = [
+            (avicennia['water_depth'].values < h_pneu),
+            (avicennia['water_depth'].values >= h_pneu)
+            ]
+        val_avc = [
+            np.pi*d_pneu*avicennia['water_depth'].values/12,
+            np.pi*d_pneu*h_pneu/12
+            ]
+    
+        avicennia['Vm_pneu'] = np.select(cond_avc, val_avc, default='NA').astype(float)
+    
+        avicennia['Vm_pneu_total'] = avicennia['Vm_pneu']*avicennia['N_pneu']
+        avicennia['Am_pneu_total'] = d_pneu*h_pneu*avicennia['N_pneu']
+    
+        # Calculate the d_0 from height of the tree, wait for Uwe Grueter Confirmation
+        # height is adjusted from the water depth
+        avicennia['Vm_trunk'] = np.pi/4*(avicennia['dbh_cm']/100)**2*avicennia['water_depth']#m^3 
+        avicennia['Am_trunk'] = (avicennia['dbh_cm']/100)*avicennia['water_depth'] #m^3 
+    
+        # sum of the obstacle volume
+        avicennia['Vm_avc'] = avicennia['Vm_pneu_total'] + avicennia['Vm_trunk'] #m^3
+        # sum of the obstacle area
+        avicennia['Am_avc'] = avicennia['Am_pneu_total'] + avicennia['Am_trunk']#m^2  
+    except:
+        print('no avicennia')
+
+    ## Rhizopora
+    try:
+        RhDFrm_ex['x1'] = np.where(RhDFrm_ex['water_depth'] < RhDFrm_ex['HR_i'],
+            (-RhDFrm_ex['b']-np.sqrt(RhDFrm_ex['b']**2-(4*RhDFrm_ex['a']*(RhDFrm_ex['HR_i']-RhDFrm_ex['water_depth']))))/(2*RhDFrm_ex['a']),
+            0
+            )
+        try:
+            calc_L_array = RhDFrm_ex[["a", "b", "x1", "x2"]].to_numpy()
+            def calc_L(x):
+                g = lambda f, a,b: np.sqrt(1+((2*a*f)+b)**2)
+                return quad(g, x[2],x[3], args=(x[0],x[1]))[0]
+            RhDFrm_ex['L'] = np.apply_along_axis(calc_L, axis=1, arr=calc_L_array)
+        
+            RhDFrm_ex['VR_i'] = RhDFrm_ex['L']*(RhDFrm_ex['rootDia']/2)**2
+            RhDFrm_ex['AR_i'] = RhDFrm_ex['L']*RhDFrm_ex['rootDia']
+            RhDFrm_grouped = RhDFrm_ex.groupby(by='Unnamed: 0')[['VR_i','AR_i']].sum().to_numpy()
+        
+            #add the calculated V and A to main DataFrame
+            RhDFrm['Vol_Root'] = RhDFrm_grouped[:,0].tolist()
+            RhDFrm['Area_Root'] = RhDFrm_grouped[:,1].tolist()
+        except:
+            print('initiate run all water level 0m')
+            
+        
+            cond_VmAm = [
+                (RhDFrm['dbh_cm']/100 > RhDFrm['water_depth']),
+                (RhDFrm['dbh_cm']/100 <= RhDFrm['water_depth'])
+                ]
+            try:
+                answer_Vm = [
+                    0,
+                    np.pi/4*(RhDFrm['dbh_cm']/100)**2*RhDFrm['water_depth'] #m^3 
+                    ]
+                    
+                RhDFrm['Vm_stem'] = np.select(cond_VmAm, answer_Vm, default='NA').astype(float)
+            except:
+                RhDFrm['Vm_stem'] = np.nan
+        
+            try:
+                answer_Am = [
+                    0,
+                    RhDFrm['dbh_cm']/100*RhDFrm['water_depth'] #m^3 
+                    ]
+                    
+                RhDFrm['Am_stem'] = np.select(cond_VmAm, answer_Am, default='NA').astype(float)
+            except:
+                RhDFrm['Am_stem'] = np.nan
+        
+        try:
+            RhDFrm['Vm_rhiz'] = RhDFrm['Vol_Root'] + RhDFrm['Vm_stem']
+            RhDFrm['Am_rhiz'] = RhDFrm['Area_Root'] + RhDFrm['Am_stem']
+        
+        except: # this is to compensate all 0m water during initial run
+            RhDFrm['Vm_rhiz'] = RhDFrm['Vm_stem']
+            RhDFrm['Am_rhiz'] = RhDFrm['Am_stem']    
+    except:
+        print('no rhizopora')
+
+    ## Groupby and sum of the total volume-area
+    try:
+        avicennia_sum = avicennia.groupby(by='cell_number')[['Vm_avc','Am_avc']].sum()
+    except:
+        print('no avicennia')
+    try:
+        rhizopora_sum = RhDFrm.groupby(by='cell_number')[['Vm_rhiz','Am_rhiz']].sum()
+        veg_contribute = pd.concat([avicennia_sum, rhizopora_sum], axis=1)
+    except:
+        print('no rhizopora')
+
+    try:
+        veg_contribute['V_total'] = veg_contribute[["Vm_avc", "Vm_rhiz"]].sum(axis=1)
+        veg_contribute['A_total'] = veg_contribute[["Am_avc", "Am_rhiz"]].sum(axis=1)
+    except:
+        veg_contribute = pd.DataFrame()
+        try:
+            veg_contribute['V_total'] = avicennia_sum['Vm_avc']
+            veg_contribute['A_total'] = avicennia_sum['Am_avc']
+        except:
+            veg_contribute['V_total'] = RhDFrm['Vm_rhiz']
+            veg_contribute['A_total'] = RhDFrm['Am_rhiz']
+
+    ## Place the Veg Contribute to the same DataFrame with ba and hs
+    veg_ba_hs = pd.concat([lookup_hs, lookup_area, veg_contribute], axis=1)
+    e_drag = 5 # set to 5m to obtain realistic value for Cd
+    veg_ba_hs['V'] = veg_ba_hs['cell_area']*veg_ba_hs['water_depth']
+    veg_ba_hs['L'] = np.where(veg_ba_hs['V'] < veg_ba_hs['V_total'],
+                    veg_ba_hs['V'] / veg_ba_hs['A_total'],
+                    (veg_ba_hs['V'] - veg_ba_hs['V_total']) / veg_ba_hs['A_total'])
+    veg_ba_hs['Cdcalc'] = Cd_no + (e_drag/ veg_ba_hs['L'])
+    veg_ba_hs['Cdcalc'] = veg_ba_hs['Cdcalc'].fillna(Cd_no)
+    drag_prev = pd.DataFrame(drag_coeff, columns = ['drag_prev'])
+    veg_ba_hs['Cdcalc'] = np.where(veg_ba_hs['water_depth'] == 0, 
+                                   drag_prev['drag_prev'], veg_ba_hs['Cdcalc'])
+
+    ## Place the calculated Cdcalc
+    drag_coeff = veg_ba_hs['Cdcalc'].values
+    
+    return drag_coeff
+
+
+def n_n_calcDraginVect_fromPrep(avicennia_pr, RhDFrm_pr, vol_func, area_func, model_dfm, drag_coeff):
+    
+    avicennia = avicennia_pr.copy()
+    RhDFrm = RhDFrm_pr.copy()
+    # RhDFrm_ex = RhDFrm_pr_ex.copy()
+
+    Cd_no = 0.005 # assume drag coefficient without the presence of vegetation
+
+    d_pneu = 0.01 # m
+    h_pneu = 0.15 # m
+
+    ba = model_dfm.get_var('ba') #surface area of the boxes (bottom area) {"location": "face", "shape": ["ndx"]}
+    hs = model_dfm.get_var('hs') #water depth at the end of timestep {"location": "face", "shape": ["ndx"]}
+
+    lookup_area = pd.DataFrame({'cell_number':list(range(len(ba))),
+                           'cell_area':ba,
+                           })
+    lookup_hs = pd.DataFrame({'cell_number':list(range(len(ba))),
+                           'water_depth':hs,
+                           })
+    ###
+    try:
+        val_av = np.vstack(avicennia['cell_number'].values)
+        bound_hs = lookup_hs['cell_number'].values == val_av
+        avicennia['water_depth'] = np.dot(bound_hs, lookup_hs['water_depth'])
+    except: 
+        print('assign water depth: no avicennia')
+    
+    try:
+        # val_rz = np.vstack(RhDFrm_ex['cell_number'].values)
+        # bound_hs = lookup_hs['cell_number'].values == val_rz
+        # RhDFrm_ex['water_depth'] = np.dot(bound_hs, lookup_hs['water_depth'])
+        
+        val_rzo = np.vstack(RhDFrm['cell_number'].values)
+        bound_hs = lookup_hs['cell_number'].values == val_rzo
+        RhDFrm['water_depth'] = np.dot(bound_hs, lookup_hs['water_depth'])
+    except:
+        print('assign water depth: no rhizopora')
+
+    # drop based on 0 water level
+    try:
+        avicennia.drop(avicennia.loc[avicennia['water_depth']==0].index, inplace=True)
+    except:
+        print('drop water depth 0m: no avicennia')
+    try:
+        RhDFrm.drop(RhDFrm.loc[RhDFrm['water_depth']==0].index, inplace=True)
+    except:
+        print('drop water depth 0m:no rhizopora')
+
+    ## Avicennia
+    # if function to adjust the h_pneu for Avicennia
+    # this equation is from Du, Qin, et al. 2021
+    try:
+        if avicennia.size == 0:
+            print('calc Vm-Am: no avicennia due to water depth 0m')
+        else:
+            cond_avc = [
+                (avicennia['water_depth'].values < h_pneu),
+                (avicennia['water_depth'].values >= h_pneu)
+                ]
+            val_avc = [
+                np.pi*d_pneu*avicennia['water_depth'].values/12,
+                np.pi*d_pneu*h_pneu/12
+                ]
+        
+            avicennia['Vm_pneu'] = np.select(cond_avc, val_avc, default='NA').astype(float)
+        
+            avicennia['Vm_pneu_total'] = avicennia['Vm_pneu']*avicennia['N_pneu']
+            avicennia['Am_pneu_total'] = d_pneu*h_pneu*avicennia['N_pneu']
+        
+            # Calculate the d_0 from height of the tree, wait for Uwe Grueter Confirmation
+            # height is adjusted from the water depth
+            avicennia['Vm_trunk'] = np.pi/4*(avicennia['dbh_cm']/100)**2*avicennia['water_depth']#m^3 
+            avicennia['Am_trunk'] = (avicennia['dbh_cm']/100)*avicennia['water_depth'] #m^3 
+        
+            # sum of the obstacle volume
+            avicennia['Vm_avc'] = avicennia['Vm_pneu_total'] + avicennia['Vm_trunk'] #m^3
+            # sum of the obstacle area
+            avicennia['Am_avc'] = avicennia['Am_pneu_total'] + avicennia['Am_trunk']#m^2  
+    except:
+        print('calc Vm-Am: no avicennia')
+
+    ## Rhizopora
+    try:           
+        # RhDFrm['Vm_rhiz'] = g_func(RhDFrm['water_depth'], RhDFrm['dbh_cm']) #water depth(m), dbh(cm)
+        
+        data_array = RhDFrm[["water_depth", "dbh_cm"]].to_numpy()
+        def calc_vol(val):
+            return  vol_func(val[0], val[1])
+        def calc_are(val):
+            return  area_func(val[0], val[1])
+        
+        RhDFrm['Vm_rhiz'] = np.apply_along_axis(calc_vol, axis=1, arr=data_array)
+        RhDFrm['Am_rhiz'] = np.apply_along_axis(calc_are, axis=1, arr=data_array)
+        
+        # RhDFrm_ex['x1'] = np.where(RhDFrm_ex['water_depth'] < RhDFrm_ex['HR_i'],
+        #     (-RhDFrm_ex['b']-np.sqrt(RhDFrm_ex['b']**2-(4*RhDFrm_ex['a']*(RhDFrm_ex['HR_i']-RhDFrm_ex['water_depth']))))/(2*RhDFrm_ex['a']),
+        #     0
+        #     )
+        # try:
+        #     calc_L_array = RhDFrm_ex[["a", "b", "x1", "x2"]].to_numpy()
+        #     def calc_L(x):
+        #         g = lambda f, a,b: np.sqrt(1+((2*a*f)+b)**2)
+        #         return quad(g, x[2],x[3], args=(x[0],x[1]))[0]
+        #     RhDFrm_ex['L'] = np.apply_along_axis(calc_L, axis=1, arr=calc_L_array)
+        
+        #     RhDFrm_ex['VR_i'] = RhDFrm_ex['L']*(RhDFrm_ex['rootDia']/2)**2
+        #     RhDFrm_ex['AR_i'] = RhDFrm_ex['L']*RhDFrm_ex['rootDia']
+        #     RhDFrm_grouped = RhDFrm_ex.groupby(by='Unnamed: 0')[['VR_i','AR_i']].sum().to_numpy()
+        
+        #     #add the calculated V and A to main DataFrame
+        #     RhDFrm['Vol_Root'] = RhDFrm_grouped[:,0].tolist()
+        #     RhDFrm['Area_Root'] = RhDFrm_grouped[:,1].tolist()
+        # except:
+        #     print('initiate run all water level 0m')
+            
+        
+        #     cond_VmAm = [
+        #         (RhDFrm['dbh_cm']/100 > RhDFrm['water_depth']),
+        #         (RhDFrm['dbh_cm']/100 <= RhDFrm['water_depth'])
+        #         ]
+        #     try:
+        #         answer_Vm = [
+        #             0,
+        #             np.pi/4*(RhDFrm['dbh_cm']/100)**2*RhDFrm['water_depth'] #m^3 
+        #             ]
+                    
+        #         RhDFrm['Vm_stem'] = np.select(cond_VmAm, answer_Vm, default='NA').astype(float)
+        #     except:
+        #         RhDFrm['Vm_stem'] = np.nan
+        
+        #     try:
+        #         answer_Am = [
+        #             0,
+        #             RhDFrm['dbh_cm']/100*RhDFrm['water_depth'] #m^3 
+        #             ]
+                    
+        #         RhDFrm['Am_stem'] = np.select(cond_VmAm, answer_Am, default='NA').astype(float)
+        #     except:
+        #         RhDFrm['Am_stem'] = np.nan
+        
+        # try:
+        #     RhDFrm['Vm_rhiz'] = RhDFrm['Vol_Root'] + RhDFrm['Vm_stem']
+        #     RhDFrm['Am_rhiz'] = RhDFrm['Area_Root'] + RhDFrm['Am_stem']
+        
+        # except: # this is to compensate all 0m water during initial run
+        #     RhDFrm['Vm_rhiz'] = RhDFrm['Vm_stem']
+        #     RhDFrm['Am_rhiz'] = RhDFrm['Am_stem']    
+    except:
+        print('calc Vm-Am: no rhizopora')
+
+    ## Groupby and sum of the total volume-area
+    try:
+        avicennia_sum = avicennia.groupby(by='cell_number')[['Vm_avc','Am_avc']].sum()
+    except:
+        print('calc groupby: no avicennia')
+    try:
+        rhizopora_sum = RhDFrm.groupby(by='cell_number')[['Vm_rhiz','Am_rhiz']].sum()
+        veg_contribute = pd.concat([avicennia_sum, rhizopora_sum], axis=1)
+    except:
+        print('calc groupby: no rhizopora')
+        
+    try:
+        try:
+            veg_contribute['V_total'] = veg_contribute[["Vm_avc", "Vm_rhiz"]].sum(axis=1)
+            veg_contribute['A_total'] = veg_contribute[["Am_avc", "Am_rhiz"]].sum(axis=1)
+        except:
+            veg_contribute = pd.DataFrame()
+            try:
+                veg_contribute['V_total'] = avicennia_sum['Vm_avc']
+                veg_contribute['A_total'] = avicennia_sum['Am_avc']
+            except:
+                veg_contribute['V_total'] = RhDFrm['Vm_rhiz']
+                veg_contribute['A_total'] = RhDFrm['Am_rhiz']
+    except:
+        print('no rhizopora and no avicennia')
+        total_va = np.array([np.zeros(len(lookup_hs)), np.zeros(len(lookup_hs))]).T
+        total_va[:] = np.nan
+        veg_contribute = pd.DataFrame(data = total_va ,columns=['V_total', 'A_total'])
+
+    ## Place the Veg Contribute to the same DataFrame with ba and hs
+    veg_ba_hs = pd.concat([lookup_hs, lookup_area, veg_contribute], axis=1)
+    e_drag = 5 # set to 5m to obtain realistic value for Cd
+    veg_ba_hs['V'] = veg_ba_hs['cell_area']*veg_ba_hs['water_depth']
+    veg_ba_hs['L'] = np.where(veg_ba_hs['V'] < veg_ba_hs['V_total'],
+                    veg_ba_hs['V'] / veg_ba_hs['A_total'],
+                    (veg_ba_hs['V'] - veg_ba_hs['V_total']) / veg_ba_hs['A_total'])
+    veg_ba_hs['Cdcalc'] = Cd_no + (e_drag/ veg_ba_hs['L'])
+    veg_ba_hs['Cdcalc'] = veg_ba_hs['Cdcalc'].fillna(Cd_no)
+    drag_prev = pd.DataFrame(drag_coeff, columns = ['drag_prev'])
+    veg_ba_hs['Cdcalc'] = np.where(veg_ba_hs['water_depth'] == 0, 
+                                   drag_prev['drag_prev'], veg_ba_hs['Cdcalc'])
+    ## control the Cdcalc in a very shallow environment, use Cd range as in Mazda, 1997 (0.4-10)
+    veg_ba_hs['Cdcalc'] = np.where(veg_ba_hs['Cdcalc'] > 10,10, veg_ba_hs['Cdcalc'] )
+
+    ## Place the calculated Cdcalc
+    drag_coeff = veg_ba_hs['Cdcalc'].values
+    
+    return drag_coeff
+
+def calc_woo_avc_rzp(h_wl, blv_wl, model_dfm):
+    test_logic = h_wl > blv_wl # previous woo
+    # test_logic = h_wl <= blv_wl # true means dry
+    def calc_woo_per_cell(test_logic):
+        test_pd = pd.DataFrame(test_logic, columns=['data_0'])
+        test_pd['avc_1'] = test_pd['data_0'].shift(periods=-1)
+        test_pd['avc_2'] = test_pd['data_0'].shift(periods=-2)
+        test_pd['sum_avc'] = test_pd['data_0'] + test_pd['avc_1'] + test_pd['avc_2']
+        
+        test_pd['rzp_3'] = test_pd['data_0'].shift(periods=-3)
+        test_pd['rzp_4'] = test_pd['data_0'].shift(periods=-4)
+        test_pd['sum_rzp'] = test_pd['sum_avc'] + test_pd['rzp_3'] + test_pd['rzp_4']
+        
+        test_pd['sol_av'] = np.where(test_pd['sum_avc']==0,1,0) # sum_avc 0 means dry within threshold, therefore score 1
+        test_pd['sol_rzp'] = np.where(test_pd['sum_rzp']==0,1,0)
+        # test_pd['sol_av'] = np.where(test_pd['sum_avc']==3,1,0) # sum_avc 3 means dry within threshold, therefore score 1
+        # test_pd['sol_rzp'] = np.where(test_pd['sum_rzp']==5,1,0)
+        
+        val_is = np.empty(2)
+        val_is[0] = (len(test_pd.index)-test_pd['sol_av'].sum()) / len(test_pd.index)
+        val_is[1] = (len(test_pd.index)-test_pd['sol_rzp'].sum()) / len(test_pd.index)
+        # val_is[0] = test_pd['sol_av'].sum() / len(test_pd.index)
+        # val_is[1] = test_pd['sol_rzp'].sum() / len(test_pd.index)
+        
+        # return val_avc, val_rzp
+        return val_is
+    
+    val_cell = np.empty([test_logic.shape[0],2])
+    bed_is_logic = model_dfm.get_var('bl') >= 0
+    for ii in range(val_cell.shape[0]):
+        if bed_is_logic[ii] == False:
+            val_cell[ii,:] = 0
+        else:
+            val_cell[ii,:] = calc_woo_per_cell(test_logic[ii])
+    
+    # bed_is_logic = np.tile((model_dfm.get_var('bl') >= 0), (2,1)).T
+    # val_cell_last = np.where(bed_is_logic == True, val_cell, 0)
+    
+        
+    return val_cell
+
+def calc_woo_avc_rzp_hs(hs_wl, model_dfm):
+    test_logic = hs_wl <= 0.01 # where water less or equal to 1cm it is dry
+    # based on Sousa, et.al(2003) paper regarding propagule dimension
+    # test_logic = hs_wl == 0 # where completely dry
+    # test_logic = h_wl <= blv_wl # true means dry
+    def calc_woo_per_cell(test_logic):
+        test_pd = pd.DataFrame(test_logic, columns=['data_0'])
+        test_pd['avc_1'] = test_pd['data_0'].shift(periods=-1)
+        test_pd['avc_2'] = test_pd['data_0'].shift(periods=-2)
+        test_pd['sum_avc'] = test_pd['data_0'] + test_pd['avc_1'] + test_pd['avc_2']
+        
+        test_pd['rzp_3'] = test_pd['data_0'].shift(periods=-3)
+        test_pd['rzp_4'] = test_pd['data_0'].shift(periods=-4)
+        test_pd['sum_rzp'] = test_pd['sum_avc'] + test_pd['rzp_3'] + test_pd['rzp_4']
+        
+        # test_pd['sol_av'] = np.where(test_pd['sum_avc']==0,1,0) # sum_avc 0 means dry within threshold, therefore score 1
+        # test_pd['sol_rzp'] = np.where(test_pd['sum_rzp']==0,1,0)
+        test_pd['sol_av'] = np.where(test_pd['sum_avc']==3,1,0) # sum_avc 3 means dry within threshold, therefore score 1
+        test_pd['sol_rzp'] = np.where(test_pd['sum_rzp']==5,1,0)
+        
+        val_is = np.empty(2)
+        # val_is[0] = (len(test_pd.index)-test_pd['sol_av'].sum()) / len(test_pd.index)
+        # val_is[1] = (len(test_pd.index)-test_pd['sol_rzp'].sum()) / len(test_pd.index)
+        val_is[0] = test_pd['sol_av'].sum() / len(test_pd.index) # probabillity of survival
+        val_is[1] = test_pd['sol_rzp'].sum() / len(test_pd.index)
+        
+        # return val_avc, val_rzp
+        return val_is
+    
+    val_cell = np.empty([test_logic.shape[0],2])
+    bed_is_logic = model_dfm.get_var('bl') >= 0
+    for ii in range(val_cell.shape[0]):
+        if bed_is_logic[ii] == False:
+            val_cell[ii,:] = 0
+        else:
+            val_cell[ii,:] = calc_woo_per_cell(test_logic[ii])   
+        
+    return val_cell
